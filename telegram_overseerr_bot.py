@@ -491,13 +491,16 @@ def check_session_validity(session_cookie: str) -> bool:
 ###############################################################################
 #              OVERSEERR API: REQUEST & ISSUE CREATION
 ###############################################################################
-def request_media(media_id: int, media_type: str, requested_by: int = None, is4k: bool = False, session_cookie: str = None) -> tuple[bool, str]:
+def request_media(media_id: int, media_type: str, requested_by: int = None, is4k: bool = False, session_cookie: str = None, seasons: str = "all") -> tuple[bool, str]:
     payload = {"mediaType": media_type, "mediaId": media_id, "is4k": is4k}
     if requested_by is not None:  # Only in API Mode
         payload["userId"] = requested_by
     
     if media_type == "tv":
-        payload["seasons"] = "all"
+        if seasons == "all":
+            payload["seasons"] = seasons
+        else:
+            payload["seasons"] = int(seasons)
 
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
     if session_cookie:
@@ -1518,6 +1521,32 @@ async def toggle_user_silent(query: CallbackQuery, context: ContextTypes.DEFAULT
     # Refresh the menu to display the new silent mode
     await show_manage_notifications_menu(query, context)
 
+async def get_tv_show_seasons(tv_show_id: int) -> list:
+    logger.debug(f"Fetching seasons for TV show ID {tv_show_id} from Overseerr.")
+    """
+    Fetches the seasons for a given TV show ID from Overseerr.
+    Returns a list of seasons or an empty list if not found.
+    """
+    url = f"{OVERSEERR_API_URL}/tv/{tv_show_id}"
+    headers = {
+        "X-Api-Key": OVERSEERR_API_KEY,
+        "Content-Type": "application/json"
+    }
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        seasons = data.get("seasons", [])
+        logger.info(f"Fetched seasons for TV show {tv_show_id}: {seasons}")
+        if not seasons:
+            logger.info(f"No seasons found for TV show {tv_show_id}.")
+            return []
+        
+        return seasons
+    except requests.RequestException as e:
+        logger.error(f"Failed to fetch seasons for TV show {tv_show_id}: {e}")
+        return []
+
 ########################################################################
 #                    /check COMMAND
 ########################################################################
@@ -1692,6 +1721,7 @@ async def process_user_selection(
 
     # Basic media info
     media_title = result.get("title", "Unknown Title")
+    media_type = result.get("mediaType", "Unknown Type")
     media_year = result.get("year", "????")
     poster = result.get("poster")
     description = result.get("description", "No description available")
@@ -1727,6 +1757,9 @@ async def process_user_selection(
     # Helper to see if we can request a given resolution
     def can_request_resolution(code: int) -> bool:
         return code not in REQUESTED_STATUSES
+    
+    def can_request_seasons(media_type: str) -> bool:
+        return media_type == "tv"
 
     # Build the inline keyboard
     keyboard = []
@@ -1734,17 +1767,36 @@ async def process_user_selection(
 
     # Build request_buttons list
     request_buttons = []
-    if can_request_resolution(status_hd):
+    if can_request_seasons(media_type): # Check if the media type is TV
+        seasons = await get_tv_show_seasons(result["id"])
+        if seasons:
+            for season in seasons:
+                season_number = season.get("seasonNumber", "Unknown")
+                episode_count = season.get("episodeCount", "Unknown")
+                button_text = f"Request S{season_number} ({episode_count} episodes)"
+                callback_data = f"season_select_{result['id']}_{season_number}"
+                keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
+        
+        if can_request_resolution(status_hd):
+            btn_1080p = InlineKeyboardButton("📥 All in 1080p", callback_data=f"confirm_1080p_{result['id']}")
+            request_buttons.append(btn_1080p)
+
+        if user_has_4k_permission and can_request_resolution(status_4k):
+            btn_4k = InlineKeyboardButton("📥 All in 4K", callback_data=f"confirm_4k_{result['id']}")
+            request_buttons.append(btn_4k)
+
+    if can_request_resolution(status_hd) and not can_request_seasons(media_type):
         btn_1080p = InlineKeyboardButton("📥 1080p", callback_data=f"confirm_1080p_{result['id']}")
         request_buttons.append(btn_1080p)
 
-    if user_has_4k_permission and can_request_resolution(status_4k):
+    if user_has_4k_permission and can_request_resolution(status_4k) and not can_request_seasons(media_type):
         btn_4k = InlineKeyboardButton("📥 4K", callback_data=f"confirm_4k_{result['id']}")
         request_buttons.append(btn_4k)
 
-    if user_has_4k_permission and can_request_resolution(status_hd) and can_request_resolution(status_4k):
+    if user_has_4k_permission and can_request_resolution(status_hd) and can_request_resolution(status_4k) and not can_request_seasons(media_type):
         btn_both = InlineKeyboardButton("📥 Both", callback_data=f"confirm_both_{result['id']}")
         request_buttons.append(btn_both)
+        
 
     # Adjust labels if exactly two buttons are present
     if len(request_buttons) == 1:
@@ -2298,6 +2350,18 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 session_cookie=session_cookie
             )
             await send_request_status(query, selected_result['title'], success_1080p, message_1080p, success_4k, message_4k)
+        elif data.startswith("season_select_"):
+            media_id = int(data.split("_")[2])
+            season_number = data.split("_")[3]
+            success, message = request_media(
+                media_id=media_id,
+                media_type=selected_result["mediaType"],
+                requested_by=requested_by,
+                is4k=True,
+                session_cookie=session_cookie,
+                seasons=season_number
+            )
+            await send_request_status(query, selected_result['title'], success_1080p=success, message_1080p=message)
         return
 
     # ---------------------------------------------------------
