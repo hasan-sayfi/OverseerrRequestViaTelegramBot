@@ -500,7 +500,7 @@ def request_media(media_id: int, media_type: str, requested_by: int = None, is4k
         if seasons == "all":
             payload["seasons"] = seasons
         else:
-            payload["seasons"] = int(seasons)
+            payload["seasons"] = [int(seasons)]
 
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
     if session_cookie:
@@ -515,6 +515,8 @@ def request_media(media_id: int, media_type: str, requested_by: int = None, is4k
         logger.info(f"Request response: Status {response.status_code}, Body: {response.text}")
         if response.status_code == 201:
             return True, "Request successful"
+        elif response.status_code == 202:
+            return True, "Season already requested"
         return False, f"Failed: {response.status_code} - {response.text}"
     except requests.RequestException as e:
         logger.error(f"Request failed: {e}")
@@ -1119,7 +1121,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         " - 📊 Check availability\n"
         " - 🎫 Request new titles\n"
         " - 🛠 Report issues\n\n"
-        "💡 *How to start:* Type `/check <title>`\n"
+        "💡 *How to search:* Type `/check <title>`\n"
         "_Example: `/check Venom`_\n\n"
         "You can also configure your preferences with [/settings]."
     )
@@ -1774,7 +1776,7 @@ async def process_user_selection(
                 season_number = season.get("seasonNumber", "Unknown")
                 episode_count = season.get("episodeCount", "Unknown")
                 button_text = f"Request S{season_number} ({episode_count} episodes)"
-                callback_data = f"season_select_{result['id']}_{season_number}"
+                callback_data = f"confirm_season_{result['id']}_{season_number}"
                 keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
         
         if can_request_resolution(status_hd):
@@ -2350,14 +2352,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 session_cookie=session_cookie
             )
             await send_request_status(query, selected_result['title'], success_1080p, message_1080p, success_4k, message_4k)
-        elif data.startswith("season_select_"):
-            media_id = int(data.split("_")[2])
-            season_number = data.split("_")[3]
+        elif data.startswith("confirm_season_"):
+            season_number = int(data.split("_")[3])
             success, message = request_media(
                 media_id=media_id,
                 media_type=selected_result["mediaType"],
                 requested_by=requested_by,
-                is4k=True,
+                is4k=False,
                 session_cookie=session_cookie,
                 seasons=season_number
             )
