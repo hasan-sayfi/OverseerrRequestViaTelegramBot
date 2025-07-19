@@ -491,7 +491,7 @@ def check_session_validity(session_cookie: str) -> bool:
 ###############################################################################
 #              OVERSEERR API: REQUEST & ISSUE CREATION
 ###############################################################################
-def request_media(media_id: int, media_type: str, requested_by: int = None, is4k: bool = False, session_cookie: str = None, seasons: str = "all") -> tuple[bool, str]:
+def request_media(media_id: int, media_type: str, requested_by: int = None, is4k: bool = False, session_cookie: str = None, seasons: str = "all", serverId: int = None, rootFolderOverride: str = None) -> tuple[bool, str]:
     payload = {"mediaType": media_type, "mediaId": media_id, "is4k": is4k}
     if requested_by is not None:  # Only in API Mode
         payload["userId"] = requested_by
@@ -501,6 +501,14 @@ def request_media(media_id: int, media_type: str, requested_by: int = None, is4k
             payload["seasons"] = seasons
         else:
             payload["seasons"] = [int(seasons)]
+    
+    # ===== Service routing parameters =====
+    if serverId is not None:
+        payload["serverId"] = serverId
+
+    if rootFolderOverride is not None:
+        payload["rootFolder"] = rootFolderOverride
+    # =====================================================
 
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
     if session_cookie:
@@ -2198,6 +2206,88 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # D) Search Pagination / Selection
     # ---------------------------------------------------------
     results = context.user_data.get("search_results", [])
+    
+    # Dispatch to correct Sonarr profile after user choice
+    if data in ("sonarr_tv", "sonarr_anime"):
+        pending = context.user_data.pop("pending_request", {})
+        if not pending:
+            await query.answer("Request expired or missing data.", show_alert=True)
+            return
+
+        # Map callback to Overseerr serverId & root folder.
+        # ---- Need to check the mapping IDs of sonarr profile ----
+        SONARR_MAP = {
+            "sonarr_tv": {
+                "serverId": 1,              # Sonarr (TV) service ID
+                "rootFolder": "/tv"         # TV root folder
+            },
+            "sonarr_anime": {
+                "serverId": 0,              # Sonarr (Anime) service ID
+                "rootFolder": "/anime"      # Anime root folder
+            }
+        }
+        chosen = SONARR_MAP[data]
+
+        # Get session info based on current mode
+        session_cookie = None
+        requested_by = None
+
+        if CURRENT_MODE == BotMode.NORMAL:
+            if "session_data" not in context.user_data:
+                await query.edit_message_caption("Please log in first (/settings).")
+                return
+            session_cookie = context.user_data["session_data"]["cookie"]
+        elif CURRENT_MODE == BotMode.SHARED:
+            shared_session = context.application.bot_data.get("shared_session")
+            if not shared_session:
+                await query.edit_message_caption("Shared session expired.")
+                return
+            session_cookie = shared_session["cookie"]
+        elif CURRENT_MODE == BotMode.API:
+            requested_by = context.user_data.get("overseerr_telegram_user_id", 1)
+
+        # Build payload additions
+        extra_opts = {
+            "serverId": chosen["serverId"],
+            "rootFolderOverride": chosen["rootFolder"]
+        }
+
+        # Submit request with overrides
+        success, msg = request_media(
+            media_id=pending["media_id"],
+            media_type=pending["media_type"],
+            requested_by=requested_by,
+            is4k=False,
+            session_cookie=session_cookie,
+            seasons=pending["season"],
+            **extra_opts
+        )
+
+        # Create proper status message for poster caption
+        choice_type = "TV Series" if data == "sonarr_tv" else "Anime"
+        status_msg = (
+            f"*Request Status for {pending['title']}*\n"
+            f"Season {pending['season']} ({choice_type})\n\n"
+            f"{'✅ Request successful' if success else f'❌ {msg}'}"
+        )
+        
+        await query.edit_message_caption(
+            caption=status_msg,
+            parse_mode="Markdown"
+        )
+        return
+
+    # Handle back button from TV/Anime selection
+    elif data == "back_to_media_details":
+        pending = context.user_data.get("pending_request", {})
+        if pending:
+            # Find the original selected result and return to media details
+            media_id = pending["media_id"]
+            selected_result = next((r for r in results if r["id"] == media_id), None)
+            if selected_result:
+                await process_user_selection(query, context, selected_result, edit_message=True)
+            context.user_data.pop("pending_request", None)
+        return
 
     if data.startswith("page_"):
         offset = int(data.split("_")[1])
@@ -2358,6 +2448,34 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await send_request_status(query, selected_result['title'], success_1080p, message_1080p, success_4k, message_4k)
         elif data.startswith("confirm_season_"):
             season_number = int(data.split("_")[3])
+            # After user selected a season, ask which Sonarr profile
+            if selected_result["mediaType"] == "tv":
+                # Store temporary context so we know what season they picked
+                context.user_data["pending_request"] = {
+                    "media_id": media_id,
+                    "season": season_number,
+                    "title": selected_result["title"],
+                    "media_type": "tv"
+                }
+
+                # Build two-button inline keyboard
+                sonarr_choose_kb = InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton("📺 TV Series", callback_data="sonarr_tv"),
+                        InlineKeyboardButton("🎴 Anime", callback_data="sonarr_anime")
+                    ],
+                    [
+                        InlineKeyboardButton("⬅️ Back", callback_data="back_to_media_details")
+                    ]
+                ])
+                await query.edit_message_caption(
+                    caption=f"*{selected_result['title']}* – Season {season_number}\n"
+                            "Is this TV Series or Anime?",
+                    parse_mode="Markdown",
+                    reply_markup=sonarr_choose_kb
+                )
+                return  # wait for user to choose
+            
             success, message = request_media(
                 media_id=media_id,
                 media_type=selected_result["mediaType"],
