@@ -499,6 +499,8 @@ def request_media(media_id: int, media_type: str, requested_by: int = None, is4k
     if media_type == "tv":
         if seasons == "all":
             payload["seasons"] = seasons
+        elif isinstance(seasons, list):
+            payload["seasons"] = [int(s) for s in seasons]  # Handle list of seasons
         else:
             payload["seasons"] = [int(seasons)]
     
@@ -1782,15 +1784,32 @@ async def process_user_selection(
     if can_request_seasons(media_type): # Check if the media type is TV
         seasons = await get_tv_show_seasons(result["id"])
         if seasons:
+            # for season in seasons:
+            #     season_number = season.get("seasonNumber", "Unknown")
+            #     episode_count = season.get("episodeCount", "Unknown")
+            #     #Add season name, season number, and episode count
+            #     season_name = season.get("name", "Unknown")
+            #     button_text = f"📥 {season_name} ({episode_count} episodes)"
+            #     callback_data = f"confirm_season_{result['id']}_{season_number}"
+            #     keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
+            # Use ✅ to mark picks; store selections in user_data["season_cart"]
+            cart = set(context.user_data.get("season_cart", []))
             for season in seasons:
-                season_number = season.get("seasonNumber", "Unknown")
-                episode_count = season.get("episodeCount", "Unknown")
-                #Add season name, season number, and episode count
+                sn = season.get("seasonNumber", "Unknown")
+                ep_cnt = season.get("episodeCount", "Unknown")
                 season_name = season.get("name", "Unknown")
-                button_text = f"📥 {season_name} ({episode_count} episodes)"
-                callback_data = f"confirm_season_{result['id']}_{season_number}"
-                keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
-        
+                tick = "✅ " if sn in cart else ""
+                btn = InlineKeyboardButton(
+                    f"{tick}📥 {season_name} ({ep_cnt} episodes)",
+                    callback_data=f"toggle_season_{result['id']}_{sn}"
+                )
+                keyboard.append([btn])
+
+            # Add finalize button when at least one season selected
+            if cart:
+                keyboard.append([
+                    InlineKeyboardButton("📥 Request Selected Seasons", callback_data=f"finalize_seasons_{result['id']}")
+                ])
         if can_request_resolution(status_hd):
             btn_1080p = InlineKeyboardButton("📥 All in 1080p", callback_data=f"confirm_1080p_{result['id']}")
             request_buttons.append(btn_1080p)
@@ -2288,7 +2307,152 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await process_user_selection(query, context, selected_result, edit_message=True)
             context.user_data.pop("pending_request", None)
         return
+    
+    # Toggle season in cart
+    elif data.startswith("toggle_season_"):
+        parts = data.split("_")
+        media_id, sn = int(parts[2]), int(parts[3])
+        cart = set(context.user_data.get("season_cart", []))
+        if sn in cart:
+            cart.remove(sn)
+        else:
+            cart.add(sn)
+        context.user_data["season_cart"] = list(cart)
+        
+        # Find the result and refresh the selection view
+        selected_result = next((r for r in results if r["id"] == media_id), None)
+        if selected_result:
+            await process_user_selection(query, context, selected_result, edit_message=True)
+        return
 
+    # Finalize multi-season request
+    elif data.startswith("finalize_seasons_"):
+        media_id = int(data.split("_")[2])
+        cart = context.user_data.get("season_cart", [])  # Don't pop yet, we need it
+        if not cart:
+            await query.answer("No seasons selected.", show_alert=True)
+            return
+
+        selected_result = next((r for r in results if r["id"] == media_id), None)
+        if not selected_result:
+            await query.edit_message_caption("Media not found.")
+            return
+
+        # Only for TV media - prompt for TV/Anime selection
+        if selected_result["mediaType"] == "tv":
+            # Store the multi-season context
+            context.user_data["pending_multi_request"] = {
+                "media_id": media_id,
+                "seasons": list(cart),  # All selected seasons
+                "title": selected_result["title"],
+                "media_type": "tv"
+            }
+
+            # Build inline keyboard with TV/Anime choice
+            sonarr_choose_kb = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("📺 TV Series", callback_data="sonarr_multi_tv"),
+                    InlineKeyboardButton("🎴 Anime", callback_data="sonarr_multi_anime")
+                ],
+                [InlineKeyboardButton("⬅️ Back", callback_data="back_to_multi_selection")]
+            ])
+            
+            await query.edit_message_caption(
+                caption=f"*{selected_result['title']}* – {len(cart)} Seasons Selected\n"
+                        f"Seasons: {', '.join(map(str, sorted(cart)))}\n\n"
+                        "Is this TV Series or Anime?",
+                parse_mode="Markdown",
+                reply_markup=sonarr_choose_kb
+            )
+            return  # Wait for user to choose TV/Anime
+        return
+    # End
+    
+    # Handle TV/Anime choice for multi-season requests
+    elif data in ("sonarr_multi_tv", "sonarr_multi_anime"):
+        pending = context.user_data.pop("pending_multi_request", {})
+        if not pending:
+            await query.answer("Request expired or missing data.", show_alert=True)
+            return
+        # Map callback to Overseerr serverId & root folder
+        SONARR_MAP = {
+            "sonarr_multi_tv": {
+                "serverId": 1,              # Your TV Sonarr service ID
+                "rootFolder": "/tv"         # TV root folder
+            },
+            "sonarr_multi_anime": {
+                "serverId": 0,              # Your Anime Sonarr service ID  
+                "rootFolder": "/anime"      # Anime root folder
+            }
+        }
+        chosen = SONARR_MAP[data]
+
+        # Get session info based on current mode
+        session_cookie = None
+        requested_by = None
+
+        if CURRENT_MODE == BotMode.NORMAL:
+            if "session_data" not in context.user_data:
+                await query.edit_message_caption("Please log in first (/settings).")
+                return
+            session_cookie = context.user_data["session_data"]["cookie"]
+        elif CURRENT_MODE == BotMode.SHARED:
+            shared_session = context.application.bot_data.get("shared_session")
+            if not shared_session:
+                await query.edit_message_caption("Shared session expired.")
+                return
+            session_cookie = shared_session["cookie"]
+        elif CURRENT_MODE == BotMode.API:
+            requested_by = context.user_data.get("overseerr_telegram_user_id", 1)
+
+        # Build payload with ALL seasons in one request
+        extra_opts = {
+            "serverId": chosen["serverId"],
+            "rootFolderOverride": chosen["rootFolder"]
+        }
+
+        # Make ONE request with ALL selected seasons
+        success, msg = request_media(
+            media_id=pending["media_id"],
+            media_type=pending["media_type"],
+            requested_by=requested_by,
+            is4k=False,
+            session_cookie=session_cookie,
+            seasons=pending["seasons"],  # Pass the list of all seasons
+            **extra_opts
+        )
+
+        # Clear the season cart now that request is made
+        context.user_data.pop("season_cart", [])
+
+        # Create status message
+        choice_type = "TV Series" if data == "sonarr_multi_tv" else "Anime"
+        season_text = f"Seasons {', '.join(map(str, sorted(pending['seasons'])))}"
+        status_msg = (
+            f"*Request Status for {pending['title']}*\n"
+            f"{season_text} ({choice_type})\n\n"
+            f"{'✅ Request successful' if success else f'❌ {msg}'}"
+        )
+        
+        await query.edit_message_caption(
+            caption=status_msg,
+            parse_mode="Markdown"
+        )
+        return
+
+    # Handle back button from multi-season TV/Anime selection
+    elif data == "back_to_multi_selection":
+        pending = context.user_data.get("pending_multi_request", {})
+        if pending:
+            # Find the original selected result and return to multi-selection view
+            media_id = pending["media_id"]
+            selected_result = next((r for r in results if r["id"] == media_id), None)
+            if selected_result:
+                # Don't clear the cart when going back
+                await process_user_selection(query, context, selected_result, edit_message=True)
+            context.user_data.pop("pending_multi_request", None)
+        return
+    # End
     if data.startswith("page_"):
         offset = int(data.split("_")[1])
         logger.info(f"User {telegram_user_id} requested page offset {offset}.")
