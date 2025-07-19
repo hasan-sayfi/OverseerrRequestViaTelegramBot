@@ -1777,7 +1777,9 @@ async def process_user_selection(
             for season in seasons:
                 season_number = season.get("seasonNumber", "Unknown")
                 episode_count = season.get("episodeCount", "Unknown")
-                button_text = f"Request S{season_number} ({episode_count} episodes)"
+                #Add season name, season number, and episode count
+                season_name = season.get("name", "Unknown")
+                button_text = f"📥 {season_name} ({episode_count} episodes)"
                 callback_data = f"confirm_season_{result['id']}_{season_number}"
                 keyboard.append([InlineKeyboardButton(button_text, callback_data=callback_data)])
         
