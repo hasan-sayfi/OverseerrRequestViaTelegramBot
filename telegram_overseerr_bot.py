@@ -1538,7 +1538,9 @@ async def get_tv_show_seasons(tv_show_id: int) -> list:
         response = requests.get(url, headers=headers)
         response.raise_for_status()
         data = response.json()
-        seasons = data.get("seasons", [])
+        seasons = data.get("seasons", [])        
+        # Remove Seasons with 0 Episodes (TBA/TBD)
+        seasons = [s for s in seasons if s.get("episodeCount", 0) > 0]
         logger.info(f"Fetched seasons for TV show {tv_show_id}: {seasons}")
         if not seasons:
             logger.info(f"No seasons found for TV show {tv_show_id}.")
