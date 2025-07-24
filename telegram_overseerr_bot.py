@@ -43,25 +43,25 @@ try:
     logger.info("Importing environment/config variables...")
     OVERSEERR_API_URL = (
         os.environ.get("OVERSEERR_API_URL")
-        or getattr(__import__("config"), "OVERSEERR_API_URL", None)
+        or getattr(__import__("bot_config"), "OVERSEERR_API_URL", None)
     )
     OVERSEERR_API_KEY = (
         os.environ.get("OVERSEERR_API_KEY")
-        or getattr(__import__("config"), "OVERSEERR_API_KEY", None)
+        or getattr(__import__("bot_config"), "OVERSEERR_API_KEY", None)
     )
     TELEGRAM_TOKEN = (
         os.environ.get("TELEGRAM_TOKEN")
-        or getattr(__import__("config"), "TELEGRAM_TOKEN", None)
+        or getattr(__import__("bot_config"), "TELEGRAM_TOKEN", None)
     )
     # password initialization
     try:
         PASSWORD = os.environ.get("PASSWORD")
         if PASSWORD is None:
-            # Try loading from config.py
-            config_module = __import__("config")
+            # Try loading from bot_config.py
+            config_module = __import__("bot_config")
             PASSWORD = getattr(config_module, "PASSWORD", None)
     except ImportError:
-        # config.py not found, use None as fallback
+        # bot_config.py not found, use None as fallback
         PASSWORD = None
     logger.info("Variables loaded successfully.")
 except Exception as e:

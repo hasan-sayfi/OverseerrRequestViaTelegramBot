@@ -188,6 +188,7 @@ data
 
 # Configuration files with sensitive data
 /config.py
+bot_config.py
 .env
 .env.local
 .env.production
