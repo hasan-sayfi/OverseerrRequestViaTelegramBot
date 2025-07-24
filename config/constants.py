@@ -4,6 +4,14 @@ Configuration constants and enums for the Overseerr Telegram Bot.
 import os
 from enum import Enum
 
+# Load .env file if it exists
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # dotenv not installed, continue with environment variables
+    pass
+
 ###############################################################################
 #                              BOT VERSION & BUILD
 ###############################################################################
@@ -26,16 +34,17 @@ try:
         os.environ.get("TELEGRAM_TOKEN")
         or getattr(__import__("config"), "TELEGRAM_TOKEN", None)
     )
-    # password initialization
-    try:
-        PASSWORD = os.environ.get("PASSWORD")
-        if PASSWORD is None:
-            # Try loading from config.py
+    # password initialization - check environment first, then config.py
+    PASSWORD = os.environ.get("PASSWORD") or os.environ.get("BOT_PASSWORD")
+    if PASSWORD is None:
+        try:
+            # Try loading from config.py as fallback
             config_module = __import__("config")
             PASSWORD = getattr(config_module, "PASSWORD", None)
-    except ImportError:
-        # config.py not found, use None as fallback
-        PASSWORD = None
+        except ImportError:
+            # config.py not found, use None as fallback
+            PASSWORD = None
+            
 except Exception as e:
     print(f"Failed to load config: {e}")
 
