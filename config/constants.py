@@ -5,12 +5,24 @@ import os
 from enum import Enum
 
 # Load .env file if it exists
+def load_env_file():
+    """Load environment variables from .env file"""
+    env_path = '.env'
+    if os.path.exists(env_path):
+        with open(env_path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)
+                    os.environ[key.strip()] = value.strip()
+
+# Try to load with python-dotenv first, fallback to manual loading
 try:
     from dotenv import load_dotenv
     load_dotenv()
 except ImportError:
-    # dotenv not installed, continue with environment variables
-    pass
+    # dotenv not installed, use manual loading
+    load_env_file()
 
 ###############################################################################
 #                              BOT VERSION & BUILD
