@@ -7,7 +7,7 @@ set -e
 
 # Configuration
 DOCKER_REPO="hsayfi/overseerr-telegram-bot"
-DEFAULT_VERSION="3.0.0"
+DEFAULT_VERSION="4.0.1"
 PLATFORMS="linux/amd64,linux/arm64"
 
 # Get version from argument or use default

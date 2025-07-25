@@ -19,11 +19,11 @@ docker login
 
 ```bash
 # Build for current platform (fastest)
-docker build -t hsayfi/overseerr-telegram-bot:3.0.0 .
+docker build -t hsayfi/overseerr-telegram-bot:4.0.1 .
 docker build -t hsayfi/overseerr-telegram-bot:latest .
 
 # Push to Docker Hub
-docker push hsayfi/overseerr-telegram-bot:3.0.0
+docker push hsayfi/overseerr-telegram-bot:4.0.1
 docker push hsayfi/overseerr-telegram-bot:latest
 ```
 
@@ -31,13 +31,13 @@ docker push hsayfi/overseerr-telegram-bot:latest
 
 **Windows:**
 ```cmd
-docker-build.bat 3.0.0
+docker-build.bat 4.0.1
 ```
 
 **Linux/macOS:**
 ```bash
 chmod +x docker-build.sh
-./docker-build.sh 3.0.0
+./docker-build.sh 4.0.1
 ```
 
 ### Option 3: Multi-Platform Build (Advanced)
@@ -50,7 +50,7 @@ docker buildx inspect --bootstrap
 # Build for multiple platforms
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
-  --tag hsayfi/overseerr-telegram-bot:3.0.0 \
+  --tag hsayfi/overseerr-telegram-bot:4.0.1 \
   --tag hsayfi/overseerr-telegram-bot:latest \
   --push \
   .
@@ -70,8 +70,8 @@ docker buildx build \
 | Tag | Purpose | Example |
 |-----|---------|---------|
 | `latest` | Latest stable release | `hsayfi/overseerr-telegram-bot:latest` |
-| `X.Y.Z` | Specific version | `hsayfi/overseerr-telegram-bot:3.0.0` |
-| `X.Y` | Minor version | `hsayfi/overseerr-telegram-bot:3.0` |
+| `X.Y.Z` | Specific version | `hsayfi/overseerr-telegram-bot:4.0.1` |
+| `X.Y` | Minor version | `hsayfi/overseerr-telegram-bot:4.0` |
 | `branch-name` | Development branch | `hsayfi/overseerr-telegram-bot:refactored` |
 
 ## 🎯 Step-by-Step Deployment
@@ -88,18 +88,18 @@ docker run --rm -e TELEGRAM_TOKEN="test" overseerr-bot-test python -c "import bo
 ### 2. Version and Tag
 ```bash
 # Tag current commit
-git tag v3.0.0
-git push origin v3.0.0
+git tag v4.0.1
+git push origin v4.0.1
 
 # Build with version tag
-docker build -t hsayfi/overseerr-telegram-bot:3.0.0 .
+docker build -t hsayfi/overseerr-telegram-bot:4.0.1 .
 docker build -t hsayfi/overseerr-telegram-bot:latest .
 ```
 
 ### 3. Push to Docker Hub
 ```bash
 # Push specific version
-docker push hsayfi/overseerr-telegram-bot:3.0.0
+docker push hsayfi/overseerr-telegram-bot:4.0.1
 
 # Push latest
 docker push hsayfi/overseerr-telegram-bot:latest
@@ -121,16 +121,16 @@ Copy and run these commands for quick deployment:
 docker login
 
 # 2. Build the image
-docker build -t hsayfi/overseerr-telegram-bot:3.0.0 .
+docker build -t hsayfi/overseerr-telegram-bot:4.0.1 .
 docker build -t hsayfi/overseerr-telegram-bot:latest .
 
 # 3. Push to Docker Hub
-docker push hsayfi/overseerr-telegram-bot:3.0.0
+docker push hsayfi/overseerr-telegram-bot:4.0.1
 docker push hsayfi/overseerr-telegram-bot:latest
 
 # 4. Verify
 echo "✅ Deployment complete!"
-echo "🐳 Image: hsayfi/overseerr-telegram-bot:3.0.0"
+echo "🐳 Image: hsayfi/overseerr-telegram-bot:4.0.1"
 echo "📦 Latest: hsayfi/overseerr-telegram-bot:latest"
 ```
 
