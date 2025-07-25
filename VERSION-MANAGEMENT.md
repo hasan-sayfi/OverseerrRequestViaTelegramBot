@@ -1,32 +1,54 @@
 # 🚀 Quick Docker Version Management
 
-This project includes powerful scripts to make Docker version management super easy and fast.
+This project includes powerful scripts to automatically manage both **version numbers AND build timestamps** across all files.
+
+## 🔄 What Gets Updated Automatically
+
+When you bump versions, the system automatically updates:
+
+### 📝 Bot Source Files (Version + Build)
+- **`config/constants.py`** - VERSION and BUILD constants
+- **`telegram_overseerr_bot.py`** - VERSION and BUILD constants  
+- **`bot.py`** - Version and Build in docstring
+
+### 🐳 Docker Configuration (Version)
+- **`docker-build.sh`** - DEFAULT_VERSION variable
+- **`docker-build.bat`** - DEFAULT_VERSION variable
+
+### 📚 Documentation (Version)
+- **`DOCKER-HUB-DEPLOY.md`** - All version references
+
+### 🏗️ Build Numbers
+- **Auto-generated** using format: `YYYY.MM.DD.HHMM`
+- **Example**: `2025.07.25.1530` (July 25, 2025 at 3:30 PM)
 
 ## 📋 Quick Commands Overview
 
 | Command | Description |
 |---------|-------------|
 | `./quick-docker.sh` | Interactive mode - guided setup |
-| `./quick-docker.sh 4.0.3` | Full deployment (update + build + push + git) |
-| `./quick-docker.sh 4.0.3 build` | Update version and build only |
-| `./quick-docker.sh 4.0.3 push` | Update, build, and push to Docker Hub |
+| `./quick-docker.sh 4.0.3` | Full deployment (update files + build + push + git) |
+| `./quick-docker.sh 4.0.3 build` | Update files and build only |
+| `./quick-docker.sh 4.0.3 push` | Update files, build, and push to Docker Hub |
 | `./quick-docker.sh show` | Show current version and status |
 | `./bump-version.sh patch` | Suggest next patch version (4.0.1 → 4.0.2) |
-| `./bump-version.sh minor` | Suggest next minor version (4.0.1 → 4.1.0) |
-| `./bump-version.sh major` | Suggest next major version (4.0.1 → 5.0.0) |
+| `./bump-version.sh patch --auto` | Auto-update files to next patch version |
+| `./bump-version.sh minor --auto` | Auto-update files to next minor version |
+| `./bump-version.sh major --auto` | Auto-update files to next major version |
 
 ## 🎯 Common Use Cases
 
-### 1. Quick Bug Fix Release
+### 1. Quick Bug Fix Release (Automatic Files + Build)
 ```bash
-# Get suggested version
-./bump-version.sh patch           # Shows: 4.0.1 → 4.0.2
+# Option A: One command does everything
+./quick-docker.sh 4.0.2           # Updates files + builds + pushes + git
 
-# Deploy it
-./quick-docker.sh 4.0.2           # Full deployment
+# Option B: Step by step  
+./bump-version.sh patch --auto     # Updates files: 4.0.1 → 4.0.2
+./quick-docker.sh 4.0.2           # Build and deploy
 ```
 
-### 2. New Feature Release
+### 2. New Feature Release (Automatic Files + Build)
 ```bash
 # Get suggested version
 ./bump-version.sh minor           # Shows: 4.0.1 → 4.1.0

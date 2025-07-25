@@ -28,12 +28,29 @@ get_current_version() {
     fi
 }
 
-# Function to update version in all config files
+# Function to get current build number
+get_current_build() {
+    if [ -f "config/constants.py" ]; then
+        grep 'BUILD = ' config/constants.py | cut -d'"' -f2
+    else
+        date '+%Y.%m.%d.%H%M'
+    fi
+}
+
+# Function to generate new build number
+generate_build_number() {
+    date '+%Y.%m.%d.%H%M'
+}
+
+# Function to update version and build in all config files
 update_version() {
     local old_version="$1"
     local new_version="$2"
+    local old_build=$(get_current_build)
+    local new_build=$(generate_build_number)
     
     echo -e "${BLUE}📝 Updating version from ${old_version} to ${new_version}...${NC}"
+    echo -e "${BLUE}🏗️ Updating build from ${old_build} to ${new_build}...${NC}"
     
     # Update docker-build.sh
     if [ -f "docker-build.sh" ]; then
@@ -45,6 +62,27 @@ update_version() {
     if [ -f "docker-build.bat" ]; then
         sed -i "s/DEFAULT_VERSION=${old_version}/DEFAULT_VERSION=${new_version}/g" docker-build.bat
         echo "  ✅ Updated docker-build.bat"
+    fi
+    
+    # Update config/constants.py
+    if [ -f "config/constants.py" ]; then
+        sed -i "s/VERSION = \"${old_version}\"/VERSION = \"${new_version}\"/g" config/constants.py
+        sed -i "s/BUILD = \"${old_build}\"/BUILD = \"${new_build}\"/g" config/constants.py
+        echo "  ✅ Updated config/constants.py"
+    fi
+    
+    # Update telegram_overseerr_bot.py
+    if [ -f "telegram_overseerr_bot.py" ]; then
+        sed -i "s/VERSION = \"${old_version}\"/VERSION = \"${new_version}\"/g" telegram_overseerr_bot.py
+        sed -i "s/BUILD = \"${old_build}\"/BUILD = \"${new_build}\"/g" telegram_overseerr_bot.py
+        echo "  ✅ Updated telegram_overseerr_bot.py"
+    fi
+    
+    # Update bot.py
+    if [ -f "bot.py" ]; then
+        sed -i "s/Version: ${old_version}/Version: ${new_version}/g" bot.py
+        sed -i "s/Build: ${old_build}/Build: ${new_build}/g" bot.py
+        echo "  ✅ Updated bot.py"
     fi
     
     # Update documentation
