@@ -50,7 +50,7 @@ docker run -d \
   -e TELEGRAM_TOKEN="YOUR_TELEGRAM_BOT_TOKEN" \
   -e PASSWORD="your_optional_password" \
   -v ./data:/app/data \
-  hasansayfi/overseerr-telegram-bot:latest
+  hsayfi/overseerr-telegram-bot:latest
 ```
 
 ## ⚙️ Environment Variables
@@ -97,12 +97,12 @@ docker-build.bat [version]
 **Manual Build**:
 ```bash
 # Single platform
-docker build -t hasansayfi/overseerr-telegram-bot:latest .
+docker build -t hsayfi/overseerr-telegram-bot:latest .
 
 # Multi-platform (requires buildx)
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
-  --tag hasansayfi/overseerr-telegram-bot:latest \
+  --tag hsayfi/overseerr-telegram-bot:latest \
   --push .
 ```
 
@@ -124,7 +124,7 @@ docker-compose pull
 docker-compose up -d
 
 # Docker Run
-docker pull hasansayfi/overseerr-telegram-bot:latest
+docker pull hsayfi/overseerr-telegram-bot:latest
 docker stop overseerr-telegram-bot
 docker rm overseerr-telegram-bot
 # Then run the docker run command again
@@ -230,4 +230,4 @@ docker-compose up -d
 
 - **Issues**: [GitHub Issues](https://github.com/hasan-sayfi/OverseerrRequestViaTelegramBot/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/hasan-sayfi/OverseerrRequestViaTelegramBot/discussions)
-- **Docker Hub**: [hasansayfi/overseerr-telegram-bot](https://hub.docker.com/r/hasansayfi/overseerr-telegram-bot)
+- **Docker Hub**: [hsayfi/overseerr-telegram-bot](https://hub.docker.com/r/hsayfi/overseerr-telegram-bot)

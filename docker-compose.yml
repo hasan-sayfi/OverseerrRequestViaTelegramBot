@@ -2,7 +2,7 @@ version: "3.9"
 services:
   telegram-bot:
     build: .
-    image: hasansayfi/overseerr-telegram-bot:latest
+    image: hsayfi/overseerr-telegram-bot:latest
     container_name: overseerr-telegram-bot
     environment:
       # Required: Overseerr API configuration

@@ -5,7 +5,7 @@
 setlocal enabledelayedexpansion
 
 :: Configuration
-set DOCKER_REPO=hasansayfi/overseerr-telegram-bot
+set DOCKER_REPO=hsayfi/overseerr-telegram-bot
 set DEFAULT_VERSION=3.0.0
 set PLATFORMS=linux/amd64,linux/arm64
 

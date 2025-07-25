@@ -6,7 +6,7 @@
 set -e
 
 # Configuration
-DOCKER_REPO="hasansayfi/overseerr-telegram-bot"
+DOCKER_REPO="hsayfi/overseerr-telegram-bot"
 DEFAULT_VERSION="3.0.0"
 PLATFORMS="linux/amd64,linux/arm64"
 
