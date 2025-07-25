@@ -2,11 +2,42 @@ version: "3.9"
 services:
   telegram-bot:
     build: .
+    image: hasansayfi/overseerr-telegram-bot:latest
+    container_name: overseerr-telegram-bot
     environment:
+      # Required: Overseerr API configuration
       OVERSEERR_API_URL: "http://YOUR_IP_ADDRESS:5055/api/v1"
       OVERSEERR_API_KEY: "YOUR_OVERSEERR_API_KEY"
+      
+      # Required: Telegram Bot Token
       TELEGRAM_TOKEN: "YOUR_TELEGRAM_TOKEN"
-      PASSWORD: "YOUR_PASSWORD" # or "" for no access control
+      
+      # Optional: Access control (leave empty for no password)
+      PASSWORD: "YOUR_PASSWORD"
+      
+      # Optional: Bot mode (normal, api, shared) - default: normal
+      BOT_MODE: "normal"
+      
+      # Optional: Python environment
+      PYTHONPATH: "/app"
+      
     volumes:
+      # Persistent data storage for sessions, configs, etc.
       - ./data:/app/data
+      
     restart: unless-stopped
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os; exit(0 if os.path.exists('/app/data/bot_health.txt') else 1)"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
