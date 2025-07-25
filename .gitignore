@@ -220,3 +220,13 @@ Thumbs.db
 # Docker volumes and data
 docker-data/
 volumes/
+
+# Bot-specific files
+bot_config.py
+overseerr_sessions.json
+user_selections.json
+shared_session.json
+notification_settings.json
+
+# Migration scripts (no longer needed)
+migrate.py

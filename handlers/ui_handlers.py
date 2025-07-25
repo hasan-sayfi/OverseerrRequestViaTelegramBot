@@ -5,16 +5,16 @@ import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
 from telegram.ext import ContextTypes
 
-from ..config.config_manager import load_config, save_config, is_command_allowed, user_is_authorized
-from ..config.constants import (
+from config.config_manager import load_config, save_config, is_command_allowed, user_is_authorized
+from config.constants import (
     CURRENT_MODE, BotMode, PASSWORD, OVERSEERR_API_URL, DEFAULT_POSTER_URL, ISSUE_TYPES
 )
-from ..session.session_manager import (
+from session.session_manager import (
     load_user_session, get_saved_user_for_telegram_id, load_shared_session
 )
-from ..utils.telegram_utils import send_message, interpret_status, can_request_resolution, is_reportable
-from ..api.overseerr_api import get_overseerr_users, user_can_request_4k, get_tv_show_seasons
-from ..notifications.notification_manager import get_user_notification_settings
+from utils.telegram_utils import send_message, interpret_status, can_request_resolution, is_reportable
+from api.overseerr_api import get_overseerr_users, user_can_request_4k, get_tv_show_seasons
+from notifications.notification_manager import get_user_notification_settings
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +61,7 @@ async def show_settings_menu(update_or_query, context: ContextTypes.DEFAULT_TYPE
         return
 
     # Refresh user data based on CURRENT_MODE
-    context.user_data.pop("overseerr_user_id", None)
+    context.user_data.pop("overseerr_telegram_user_id", None)
     context.user_data.pop("overseerr_user_name", None)
     context.user_data.pop("session_data", None)
 
@@ -69,27 +69,27 @@ async def show_settings_menu(update_or_query, context: ContextTypes.DEFAULT_TYPE
         session_data = load_user_session(telegram_user_id)
         if session_data and "cookie" in session_data:
             context.user_data["session_data"] = session_data
-            context.user_data["overseerr_user_id"] = session_data["overseerr_user_id"]
+            context.user_data["overseerr_telegram_user_id"] = session_data["overseerr_telegram_user_id"]
             context.user_data["overseerr_user_name"] = session_data.get("overseerr_user_name", "Unknown")
-            logger.info(f"Loaded Normal mode session for user {telegram_user_id}: {session_data['overseerr_user_id']}")
+            logger.info(f"Loaded Normal mode session for user {telegram_user_id}: {session_data['overseerr_telegram_user_id']}")
     elif CURRENT_MODE == BotMode.API:
         overseerr_user_id, overseerr_user_name = get_saved_user_for_telegram_id(telegram_user_id)
         if overseerr_user_id:
-            context.user_data["overseerr_user_id"] = overseerr_user_id
+            context.user_data["overseerr_telegram_user_id"] = overseerr_user_id
             context.user_data["overseerr_user_name"] = overseerr_user_name
             logger.info(f"Loaded API mode user selection for {telegram_user_id}: {overseerr_user_id} ({overseerr_user_name})")
     elif CURRENT_MODE == BotMode.SHARED:
         shared_session = load_shared_session()
         if shared_session and "cookie" in shared_session:
             context.application.bot_data["shared_session"] = shared_session
-            context.user_data["overseerr_user_id"] = shared_session["overseerr_user_id"]
+            context.user_data["overseerr_telegram_user_id"] = shared_session["overseerr_telegram_user_id"]
             context.user_data["overseerr_user_name"] = shared_session.get("overseerr_user_name", "Shared User")
-            logger.info(f"Loaded Shared mode session for user {telegram_user_id}: {shared_session['overseerr_user_id']}")
+            logger.info(f"Loaded Shared mode session for user {telegram_user_id}: {shared_session['overseerr_telegram_user_id']}")
 
     # Get current Overseerr user info (if any)
     overseerr_user_name = context.user_data.get("overseerr_user_name", "None selected")
-    overseerr_user_id = context.user_data.get("overseerr_user_id", "N/A")
-    user_info = f"{overseerr_user_name} ({overseerr_user_id}) ✅" if overseerr_user_id != "N/A" else "Not set ❌"
+    overseerr_telegram_user_id = context.user_data.get("overseerr_telegram_user_id", "N/A")
+    user_info = f"{overseerr_user_name} ({overseerr_telegram_user_id}) ✅" if overseerr_telegram_user_id != "N/A" else "Not set ❌"
 
     group_mode_status = "🟢 On" if config["group_mode"] else "🔴 Off"
 
@@ -139,7 +139,7 @@ async def show_settings_menu(update_or_query, context: ContextTypes.DEFAULT_TYPE
         ])
     
     # Show Manage Notifications only if an Overseerr user is selected
-    if overseerr_user_id != "N/A":
+    if overseerr_telegram_user_id != "N/A":
         keyboard.append([InlineKeyboardButton("🔔 Manage Notifications", callback_data="manage_notifications")])
 
     keyboard.append([InlineKeyboardButton("❌ Cancel", callback_data="cancel_settings")])
@@ -161,19 +161,8 @@ async def display_results_with_buttons(update, context: ContextTypes.DEFAULT_TYP
     total_results = len(results)
     results_to_show = results[offset:offset + 5]
 
-    # Build result text
-    result_lines = []
-    for idx, result in enumerate(results_to_show):
-        status_hd = interpret_status(result['status_hd'])
-        status_4k = interpret_status(result['status_4k'])
-        
-        result_lines.append(
-            f"{offset + idx + 1}. *{result['title']}* ({result['year']})\n"
-            f"   📺 {result['mediaType'].upper()} | HD: {status_hd} | 4K: {status_4k}"
-        )
-
-    results_text = f"🔍 *Search results for:* {search_query}\n\n" + "\n\n".join(result_lines)
-    results_text += f"\n\n📊 *Showing {offset + 1}-{min(offset + 5, total_results)} of {total_results} results*"
+    # Just show the header - no duplicate text list
+    results_text = f"🔍 *Search results for:* {search_query}\n\n📊 *Showing {offset + 1}-{min(offset + 5, total_results)} of {total_results} results*\n\nSelect a result below:"
 
     # Build keyboard
     keyboard = []
@@ -204,24 +193,15 @@ async def display_results_with_buttons(update, context: ContextTypes.DEFAULT_TYP
             results_text, parse_mode="Markdown", reply_markup=reply_markup
         )
 
-async def process_user_selection(update, context: ContextTypes.DEFAULT_TYPE, selection_index, telegram_user_id):
+def build_media_details_message(result, context: ContextTypes.DEFAULT_TYPE, selected_seasons=None):
     """
-    Process when user selects a specific media item from search results.
+    Build media details message text and keyboard.
+    Returns tuple of (media_text, keyboard).
     """
-    query = update.callback_query
-    await query.answer()
+    if selected_seasons is None:
+        selected_seasons = set()
     
-    search_results = context.user_data.get("search_results", [])
-    if selection_index >= len(search_results):
-        await query.edit_message_text("❌ Invalid selection. Please search again.")
-        return
-
-    result = search_results[selection_index]
-    context.user_data["selected_result"] = result
-
     # Build detailed media info
-    poster_url = f"https://image.tmdb.org/t/p/w500{result['poster']}" if result['poster'] else DEFAULT_POSTER_URL
-    
     media_text = f"🎬 *{result['title']}* ({result['year']})\n\n"
     media_text += f"📺 *Type:* {result['mediaType'].upper()}\n"
     media_text += f"🗓 *Release:* {result.get('release_date_full', 'Unknown')}\n\n"
@@ -238,15 +218,15 @@ async def process_user_selection(update, context: ContextTypes.DEFAULT_TYPE, sel
     keyboard = []
     back_button = InlineKeyboardButton("⬅️ Back", callback_data="back_to_results")
 
-    overseerr_user_id = context.user_data.get("overseerr_user_id")
-    if overseerr_user_id:
+    overseerr_telegram_user_id = context.user_data.get("overseerr_telegram_user_id")
+    if overseerr_telegram_user_id:
         # Request buttons
         if can_request_resolution(result['status_hd']):
             if result['mediaType'] == 'tv':
-                seasons = await get_tv_show_seasons(result['id'])
+                # Get seasons from cache
+                seasons = context.user_data.get(f"seasons_{result['id']}")
                 if seasons and len(seasons) > 1:
                     # Multiple seasons - show season selection
-                    selected_seasons = context.user_data.get('selected_seasons', set())
                     for sn in seasons:
                         is_selected = sn in selected_seasons
                         emoji = "✅" if is_selected else "⭕"
@@ -266,7 +246,7 @@ async def process_user_selection(update, context: ContextTypes.DEFAULT_TYPE, sel
             
             keyboard.append([btn_1080p])
 
-        if can_request_resolution(result['status_4k']) and user_can_request_4k(overseerr_user_id, result['mediaType']):
+        if can_request_resolution(result['status_4k']) and user_can_request_4k(overseerr_telegram_user_id, result['mediaType']):
             if result['mediaType'] == 'tv':
                 btn_4k = InlineKeyboardButton("📥 All in 4K", callback_data=f"confirm_4k_{result['id']}")
             else:
@@ -281,19 +261,136 @@ async def process_user_selection(update, context: ContextTypes.DEFAULT_TYPE, sel
                 keyboard.append([report_button])
 
     keyboard.append([back_button])
+    return media_text, keyboard
+
+async def process_user_selection(update_or_query, context: ContextTypes.DEFAULT_TYPE, selection_index, telegram_user_id):
+    """
+    Process when user selects a specific media item from search results.
+    Can be called with either Update (from command) or CallbackQuery (from button).
+    """
+    # Handle both Update and CallbackQuery inputs
+    if hasattr(update_or_query, 'callback_query'):
+        # It's an Update object
+        query = update_or_query.callback_query
+        await query.answer()
+    else:
+        # It's already a CallbackQuery
+        query = update_or_query
+        await query.answer()
+    
+    search_results = context.user_data.get("search_results", [])
+    if selection_index >= len(search_results):
+        await query.edit_message_text("❌ Invalid selection. Please search again.")
+        return
+
+    result = search_results[selection_index]
+    context.user_data["selected_result"] = result
+
+    # Clear any previous season selections when viewing a new media item
+    previous_result = context.user_data.get("selected_result")
+    if not previous_result or previous_result.get('id') != result.get('id'):
+        context.user_data.pop('selected_seasons', None)
+
+    # Load authentication data based on current mode
+    config = load_config()
+    user_id_str = str(telegram_user_id)
+    user = config["users"].get(user_id_str, {})
+
+    # Initialize user authentication data
+    context.user_data.pop("overseerr_telegram_user_id", None)
+    context.user_data.pop("overseerr_user_name", None)
+    context.user_data.pop("session_data", None)
+
+    if CURRENT_MODE == BotMode.NORMAL:
+        session_data = load_user_session(telegram_user_id)
+        if session_data and "cookie" in session_data:
+            context.user_data["session_data"] = session_data
+            context.user_data["overseerr_telegram_user_id"] = session_data["overseerr_telegram_user_id"]
+            context.user_data["overseerr_user_name"] = session_data.get("overseerr_user_name", "Unknown")
+    elif CURRENT_MODE == BotMode.API:
+        overseerr_user_id, overseerr_user_name = get_saved_user_for_telegram_id(telegram_user_id)
+        if overseerr_user_id:
+            context.user_data["overseerr_telegram_user_id"] = overseerr_user_id
+            context.user_data["overseerr_user_name"] = overseerr_user_name
+    elif CURRENT_MODE == BotMode.SHARED:
+        shared_session = load_shared_session()
+        if shared_session and "cookie" in shared_session:
+            context.application.bot_data["shared_session"] = shared_session
+            context.user_data["overseerr_telegram_user_id"] = shared_session["overseerr_telegram_user_id"]
+            context.user_data["overseerr_user_name"] = shared_session.get("overseerr_user_name", "Shared User")
+
+    # Cache seasons data for TV shows if not already cached
+    if result['mediaType'] == 'tv':
+        seasons_key = f"seasons_{result['id']}"
+        if seasons_key not in context.user_data:
+            seasons = await get_tv_show_seasons(result['id'])
+            if seasons and len(seasons) > 1:
+                context.user_data[seasons_key] = seasons
+
+    # Get selected seasons for display
+    selected_seasons = set(context.user_data.get('selected_seasons', []))
+    
+    # Build media details using the new function
+    media_text, keyboard = build_media_details_message(result, context, selected_seasons)
+    
+    # Check if user is authenticated - if not, show authentication message
+    overseerr_telegram_user_id = context.user_data.get("overseerr_telegram_user_id")
+    if not overseerr_telegram_user_id:
+        auth_message = "🔐 *Authentication Required*\n\n"
+        auth_message += f"To request *{result['title']}*, please authenticate first using /settings"
+        
+        keyboard = [[InlineKeyboardButton("⚙️ Settings", callback_data="show_settings")]]
+        keyboard.append([InlineKeyboardButton("⬅️ Back", callback_data="back_to_results")])
+        media_text += f"\n\n{auth_message}"
+    
+    poster_url = f"https://image.tmdb.org/t/p/w500{result['poster']}" if result['poster'] else DEFAULT_POSTER_URL
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    # Send media info with poster
+    # Send media info with poster using send_photo
     try:
-        msg = await query.edit_message_text(
-            media_text, parse_mode="Markdown", reply_markup=reply_markup
-        )
+        # Check if we're editing an existing message or creating new one
+        if hasattr(query, 'message') and query.message.photo:
+            # Edit existing photo message caption
+            msg = await query.edit_message_caption(
+                caption=media_text, parse_mode="Markdown", reply_markup=reply_markup
+            )
+        else:
+            # Delete the old message and send new photo message
+            try:
+                await query.message.delete()
+            except:
+                pass  # Ignore if deletion fails
+            
+            msg = await context.bot.send_photo(
+                chat_id=query.message.chat_id,
+                photo=poster_url,
+                caption=media_text,
+                parse_mode="Markdown",
+                reply_markup=reply_markup
+            )
         context.user_data["media_message_id"] = msg.message_id
     except Exception as e:
-        logger.error(f"Failed to edit message with media details: {e}")
-        await query.message.reply_text(
-            media_text, parse_mode="Markdown", reply_markup=reply_markup
-        )
+        logger.error(f"Failed to send photo with media details: {e}")
+        # Fallback to text message if photo fails
+        try:
+            # Delete the old message first
+            try:
+                await query.message.delete()
+            except:
+                pass
+            
+            msg = await context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text=media_text,
+                parse_mode="Markdown", 
+                reply_markup=reply_markup
+            )
+            context.user_data["media_message_id"] = msg.message_id
+        except Exception as e2:
+            logger.error(f"Failed to send message with media details: {e2}")
+            await query.message.reply_text(
+                media_text, parse_mode="Markdown", reply_markup=reply_markup
+            )
 
 async def handle_change_user(update_or_query, context: ContextTypes.DEFAULT_TYPE, is_initial=False, offset=0):
     """

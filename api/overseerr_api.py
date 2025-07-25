@@ -6,7 +6,7 @@ import requests
 import urllib.parse
 from typing import Optional, Tuple, List
 
-from ..config.constants import OVERSEERR_API_URL, OVERSEERR_API_KEY, CURRENT_MODE, BotMode
+from config.constants import OVERSEERR_API_URL, OVERSEERR_API_KEY, CURRENT_MODE, BotMode
 
 logger = logging.getLogger(__name__)
 
@@ -295,7 +295,7 @@ def user_can_request_4k(overseerr_user_id: int, media_type: str) -> bool:
     """
     Check if a user has permissions to request 4K content.
     """
-    from ..config.constants import PERMISSION_4K_MOVIE, PERMISSION_4K_TV
+    from config.constants import PERMISSION_4K_MOVIE, PERMISSION_4K_TV
     
     try:
         url = f"{OVERSEERR_API_URL}/user/{overseerr_user_id}"

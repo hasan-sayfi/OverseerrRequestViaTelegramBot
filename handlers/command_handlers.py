@@ -8,12 +8,12 @@ from datetime import datetime, timezone
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
-from ..config.config_manager import load_config, save_config, is_command_allowed
-from ..config.constants import PASSWORD, CURRENT_MODE, BotMode, VERSION, BUILD
-from ..session.session_manager import save_user_session, load_user_sessions, save_user_sessions, save_shared_session
-from ..utils.telegram_utils import send_message
-from ..api.overseerr_api import overseerr_login, search_media, process_search_results
-from ..notifications.notification_manager import enable_global_telegram_notifications
+from config.config_manager import load_config, save_config, is_command_allowed
+from config.constants import PASSWORD, CURRENT_MODE, BotMode, VERSION, BUILD
+from session.session_manager import save_user_session, load_user_sessions, save_user_sessions, save_shared_session
+from utils.telegram_utils import send_message
+from api.overseerr_api import overseerr_login, search_media, process_search_results
+from notifications.notification_manager import enable_global_telegram_notifications
 from .ui_handlers import show_settings_menu, display_results_with_buttons
 
 logger = logging.getLogger(__name__)
@@ -117,9 +117,7 @@ async def check_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
     search_query = " ".join(context.args)
     logger.info(f"User {telegram_user_id} searching for: {search_query}")
 
-    # Perform search
-    await send_message(context, chat_id, f"🔍 *Searching for:* {search_query}\n\nPlease wait...", message_thread_id=message_thread_id)
-    
+    # Perform search directly without "searching..." message
     search_results = search_media(search_query)
     if not search_results:
         await send_message(context, chat_id, "❌ *Search failed.* Please try again later.", message_thread_id=message_thread_id)

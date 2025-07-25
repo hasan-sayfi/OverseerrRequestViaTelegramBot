@@ -5,8 +5,8 @@ import logging
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from ..config.constants import CURRENT_MODE, BotMode
-from ..session.session_manager import load_user_session, get_saved_user_for_telegram_id, load_shared_session
+from config.constants import CURRENT_MODE, BotMode
+from session.session_manager import load_user_session, get_saved_user_for_telegram_id, load_shared_session
 
 logger = logging.getLogger(__name__)
 

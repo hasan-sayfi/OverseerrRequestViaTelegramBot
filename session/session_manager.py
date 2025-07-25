@@ -6,7 +6,7 @@ import os
 import logging
 from typing import Optional
 
-from ..config.constants import USER_SESSIONS_FILE, SHARED_SESSION_FILE, USER_SELECTION_FILE
+from config.constants import USER_SESSIONS_FILE, SHARED_SESSION_FILE, USER_SELECTION_FILE
 
 logger = logging.getLogger(__name__)
 

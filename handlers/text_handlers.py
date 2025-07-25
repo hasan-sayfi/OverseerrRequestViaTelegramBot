@@ -5,18 +5,58 @@ import logging
 import base64
 import requests
 from datetime import datetime, timezone
-from telegram import Update
+from telegram import Update, CallbackQuery
 from telegram.ext import ContextTypes
 
-from ..config.config_manager import load_config, save_config, is_command_allowed
-from ..config.constants import PASSWORD, CURRENT_MODE, BotMode, OVERSEERR_API_URL
-from ..session.session_manager import load_user_sessions, save_user_sessions, save_shared_session
-from ..utils.telegram_utils import send_message
-from ..api.overseerr_api import overseerr_login, create_issue
+from config.config_manager import load_config, save_config, is_command_allowed
+from config.constants import PASSWORD, CURRENT_MODE, BotMode, OVERSEERR_API_URL
+from session.session_manager import load_user_sessions, save_user_sessions, save_shared_session
+from utils.telegram_utils import send_message
+from api.overseerr_api import overseerr_login, create_issue
 from .command_handlers import start_command
 from .ui_handlers import show_settings_menu
 
 logger = logging.getLogger(__name__)
+
+async def start_login(update_or_query, context: ContextTypes.DEFAULT_TYPE):
+    """Initiates login, deleting the settings menu and cleaning up prompts."""
+    if isinstance(update_or_query, Update):
+        telegram_user_id = update_or_query.effective_user.id
+        message = update_or_query.message
+    else:  # CallbackQuery
+        telegram_user_id = update_or_query.from_user.id
+        message = update_or_query.message
+
+    logger.info(f"User {telegram_user_id} started login process.")
+
+    # Check mode restrictions
+    if CURRENT_MODE == BotMode.API:
+        await message.reply_text("In API Mode, no login is required.")
+        return
+
+    if CURRENT_MODE == BotMode.SHARED:
+        config = load_config()
+        user_id_str = str(telegram_user_id)
+        user = config["users"].get(user_id_str, {})
+        if not user.get("is_admin", False):
+            await message.reply_text("In Shared Mode, only admins can log in.")
+            return
+
+    # Delete the settings menu if this is a callback query
+    if isinstance(update_or_query, CallbackQuery):
+        try:
+            await message.delete()
+            logger.info(f"Deleted settings menu message for user {telegram_user_id} during login.")
+        except Exception as e:
+            logger.warning(f"Failed to delete settings menu message: {e}")
+
+    # Set login state and prompt for email
+    context.user_data["login_step"] = "email"
+    msg = await context.bot.send_message(
+        chat_id=message.chat_id,
+        text="Please enter your Overseerr email address:"
+    )
+    context.user_data["login_message_id"] = msg.message_id
 
 async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -89,11 +129,11 @@ async def handle_issue_report(update: Update, context: ContextTypes.DEFAULT_TYPE
     media_title = selected_result['title']
     media_type = selected_result['mediaType']
 
-    overseerr_user_id = context.user_data.get("overseerr_user_id")
+    overseerr_telegram_user_id = context.user_data.get("overseerr_telegram_user_id")
     user_display_name = context.user_data.get("overseerr_user_name", "Unknown User")
     logger.info(
         f"User {telegram_user_id} is reporting an issue on mediaId {media_id} "
-        f"as Overseerr user {overseerr_user_id}."
+        f"as Overseerr user {overseerr_telegram_user_id}."
     )
 
     final_issue_description = f"(Reported by {user_display_name})\n\n{issue_description}"
@@ -103,7 +143,7 @@ async def handle_issue_report(update: Update, context: ContextTypes.DEFAULT_TYPE
         media_type=media_type,
         issue_description=final_issue_description,
         issue_type=issue_type_id,
-        user_id=overseerr_user_id
+        user_id=overseerr_telegram_user_id
     )
 
     if success:
@@ -214,7 +254,7 @@ async def handle_overseerr_login(update: Update, context: ContextTypes.DEFAULT_T
             session_data = {
                 "cookie": session_cookie,
                 "credentials": credentials,
-                "overseerr_user_id": overseerr_id,
+                "overseerr_telegram_user_id": overseerr_id,
                 "overseerr_user_name": user_info.get("displayName", "Unknown")
             }
             context.user_data["session_data"] = session_data

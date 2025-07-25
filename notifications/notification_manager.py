@@ -5,7 +5,7 @@ import logging
 import requests
 from typing import Dict, Optional
 
-from ..config.constants import OVERSEERR_API_URL, OVERSEERR_API_KEY, TELEGRAM_TOKEN
+from config.constants import OVERSEERR_API_URL, OVERSEERR_API_KEY, TELEGRAM_TOKEN
 
 logger = logging.getLogger(__name__)
 

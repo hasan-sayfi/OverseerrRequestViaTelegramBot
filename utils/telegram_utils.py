@@ -5,7 +5,7 @@ import logging
 from typing import Optional
 from telegram.ext import ContextTypes
 
-from ..config.config_manager import load_config
+from config.config_manager import load_config
 
 logger = logging.getLogger(__name__)
 
