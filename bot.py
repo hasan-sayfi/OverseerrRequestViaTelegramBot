@@ -4,7 +4,7 @@ Overseerr Telegram Bot - Main entry point
 A Telegram bot for interacting with Overseerr media requests.
 
 Version: 4.1.0
-Build: 2025.08.22.0555
+Build: 2025.08.22.0601
 """
 
 import logging

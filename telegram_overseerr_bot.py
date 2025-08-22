@@ -27,7 +27,7 @@ from telegram.ext import (
 #                              BOT VERSION & BUILD
 ###############################################################################
 VERSION = "4.1.0"
-BUILD = "2025.08.22.0555"
+BUILD = "2025.08.22.0601"
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
