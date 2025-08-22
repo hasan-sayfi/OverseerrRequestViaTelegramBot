@@ -7,9 +7,9 @@ from telegram.ext import ContextTypes
 
 from config.config_manager import load_config, save_config
 from config.constants import CURRENT_MODE, BotMode, ISSUE_TYPES
-from session.session_manager import save_user_selection, clear_shared_session
+from session.session_manager import save_user_selection, clear_shared_session, clear_user_session
 from utils.telegram_utils import send_message
-from api.overseerr_api import request_media, get_overseerr_users
+from api.overseerr_api import request_media, get_overseerr_users, overseerr_logout
 from notifications.notification_manager import update_telegram_settings_for_user, get_user_notification_settings
 from .ui_handlers import (
     show_settings_menu, display_results_with_buttons, process_user_selection, handle_change_user
@@ -18,29 +18,59 @@ from .text_handlers import start_login
 
 logger = logging.getLogger(__name__)
 
+def escape_markdown(text: str) -> str:
+    """Escape special Markdown characters to prevent parsing errors."""
+    if not text:
+        return text
+    # Escape all markdown special characters
+    return text.replace('*', '\\*').replace('_', '\\_').replace('[', '\\[').replace(']', '\\]').replace('(', '\\(').replace(')', '\\)').replace('`', '\\`').replace('~', '\\~').replace('>', '\\>')
+
 async def safe_edit_message(query: CallbackQuery, text: str, parse_mode="Markdown", reply_markup=None):
     """
     Safely edit a message, handling both photo (caption) and text messages.
+    Also handles cases where content is identical or message type conflicts.
     """
     try:
-        if hasattr(query.message, 'photo') and query.message.photo:
-            # It's a photo message, edit caption
+        current_message = query.message
+        
+        # Check if we're trying to edit with identical content
+        if hasattr(current_message, 'text') and current_message.text:
+            if current_message.text.strip() == text.strip():
+                logger.debug("Skipping message edit - content is identical")
+                return
+        elif hasattr(current_message, 'caption') and current_message.caption:
+            if current_message.caption.strip() == text.strip():
+                logger.debug("Skipping caption edit - content is identical")
+                return
+        
+        # Handle photo messages (edit caption)
+        if hasattr(current_message, 'photo') and current_message.photo:
             await query.edit_message_caption(
                 caption=text,
                 parse_mode=parse_mode,
                 reply_markup=reply_markup
             )
-        else:
-            # It's a text message, edit text
+        # Handle text messages (edit text)
+        elif hasattr(current_message, 'text'):
             await query.edit_message_text(
                 text,
                 parse_mode=parse_mode,
                 reply_markup=reply_markup
             )
+        else:
+            # Fallback: send new message if we can't edit
+            logger.warning("Cannot edit message - sending new message instead")
+            await query.message.reply_text(text, parse_mode=parse_mode, reply_markup=reply_markup)
+            
     except Exception as e:
-        logger.error(f"Failed to edit message: {e}")
-        # Fallback: send new message
-        await query.message.reply_text(text, parse_mode=parse_mode, reply_markup=reply_markup)
+        logger.warning(f"Failed to edit message: {e}")
+        try:
+            # Try to send a new message as fallback
+            await query.message.reply_text(text, parse_mode=parse_mode, reply_markup=reply_markup)
+        except Exception as fallback_error:
+            logger.error(f"Even fallback message failed: {fallback_error}")
+            # Last resort - just answer the query
+            await query.answer("Action completed", show_alert=True)
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -217,17 +247,37 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     except Exception as e:
         logger.error(f"Error in button_handler: {e}")
-        await safe_edit_message(query, "❌ An error occurred. Please try again.")
+        import traceback
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+        # Show more specific error message
+        error_msg = f"❌ Error: {str(e)}" if str(e) else "❌ An unknown error occurred. Check logs for details."
+        await safe_edit_message(query, error_msg)
 
 async def handle_logout(query: CallbackQuery, context: ContextTypes.DEFAULT_TYPE):
     """Handle logout for different modes."""
     telegram_user_id = query.from_user.id
     
     if CURRENT_MODE == BotMode.NORMAL:
-        # Clear user session
+        # Get session cookie before clearing
+        session_data = context.user_data.get("session_data", {})
+        session_cookie = session_data.get("cookie")
+        
+        # Call Overseerr logout API if we have a session cookie
+        if session_cookie:
+            logout_success = overseerr_logout(session_cookie)
+            if logout_success:
+                logger.info(f"User {telegram_user_id} successfully logged out from Overseerr")
+            else:
+                logger.warning(f"Failed to logout user {telegram_user_id} from Overseerr, but clearing local session")
+        
+        # Clear user session data from memory
         context.user_data.pop("session_data", None)
         context.user_data.pop("overseerr_telegram_user_id", None)
         context.user_data.pop("overseerr_user_name", None)
+        
+        # Clear user session from persistent storage
+        clear_user_session(telegram_user_id)
+        
         await query.edit_message_text("🔓 Successfully logged out!")
     
     elif CURRENT_MODE == BotMode.SHARED:
@@ -235,6 +285,19 @@ async def handle_logout(query: CallbackQuery, context: ContextTypes.DEFAULT_TYPE
         config = load_config()
         user = config["users"].get(str(telegram_user_id), {})
         if user.get("is_admin", False):
+            # Get shared session cookie before clearing
+            shared_session = context.application.bot_data.get("shared_session", {})
+            session_cookie = shared_session.get("cookie")
+            
+            # Call Overseerr logout API if we have a session cookie
+            if session_cookie:
+                logout_success = overseerr_logout(session_cookie)
+                if logout_success:
+                    logger.info(f"Admin {telegram_user_id} successfully logged out shared session from Overseerr")
+                else:
+                    logger.warning(f"Failed to logout shared session from Overseerr, but clearing local session")
+            
+            # Clear shared session
             clear_shared_session()
             context.application.bot_data.pop("shared_session", None)
             context.user_data.pop("overseerr_telegram_user_id", None)
@@ -303,12 +366,23 @@ async def _process_direct_media_request(query: CallbackQuery, context: ContextTy
     
     if CURRENT_MODE == BotMode.NORMAL:
         session_data = context.user_data.get("session_data")
-        if session_data:
-            session_cookie = session_data.get("cookie")
+        if not session_data:
+            await safe_edit_message(query, "❌ You are not logged in. Please use /settings to login first.")
+            return
+        session_cookie = session_data.get("cookie")
+        if not session_cookie:
+            await safe_edit_message(query, "❌ Invalid session. Please login again via /settings.")
+            return
     elif CURRENT_MODE == BotMode.SHARED:
         shared_session = context.application.bot_data.get("shared_session")
-        if shared_session:
-            session_cookie = shared_session.get("cookie")
+        if not shared_session:
+            await safe_edit_message(query, "❌ No shared session available. Admin needs to login via /settings.")
+            return
+        session_cookie = shared_session.get("cookie")
+    elif CURRENT_MODE == BotMode.API:
+        if not overseerr_user_id:
+            await safe_edit_message(query, "❌ No Overseerr user selected. Please use /settings to select a user.")
+            return
     
     # Make request
     success, message = request_media(
@@ -374,7 +448,7 @@ async def show_mode_selection(query: CallbackQuery, context: ContextTypes.DEFAUL
     ]
     
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text(text, parse_mode="Markdown", reply_markup=reply_markup)
+    await safe_edit_message(query, text, parse_mode="Markdown", reply_markup=reply_markup)
 
 async def handle_mode_change(query: CallbackQuery, context: ContextTypes.DEFAULT_TYPE, mode: str):
     """Handle bot mode change."""
@@ -429,7 +503,7 @@ async def show_user_management_menu(query: CallbackQuery, context: ContextTypes.
             [InlineKeyboardButton("⬅️ Back to Settings", callback_data="back_to_settings")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=reply_markup)
+        await safe_edit_message(query, text, parse_mode="Markdown", reply_markup=reply_markup)
         return
 
     page_size = 5
@@ -456,7 +530,7 @@ async def show_user_management_menu(query: CallbackQuery, context: ContextTypes.
     keyboard.append(navigation_buttons)
 
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text(text, parse_mode="Markdown", reply_markup=reply_markup)
+    await safe_edit_message(query, text, parse_mode="Markdown", reply_markup=reply_markup)
 
 async def manage_specific_user(query: CallbackQuery, context: ContextTypes.DEFAULT_TYPE, user_id: str):
     """Manage a specific user (block, unblock, promote, demote)."""
@@ -496,7 +570,7 @@ async def manage_specific_user(query: CallbackQuery, context: ContextTypes.DEFAU
     keyboard.append([InlineKeyboardButton("⬅️ Back to User List", callback_data="manage_users")])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text(text, parse_mode="Markdown", reply_markup=reply_markup)
+    await safe_edit_message(query, text, parse_mode="Markdown", reply_markup=reply_markup)
 
 async def handle_user_promotion(query: CallbackQuery, context: ContextTypes.DEFAULT_TYPE, user_id: str, promote: bool):
     """Handle user promotion/demotion."""
@@ -729,12 +803,14 @@ async def show_manage_notifications_menu(query: CallbackQuery, context: ContextT
     # We interpret telegram_bitmask > 0 to mean "enabled"
     telegram_is_enabled = (telegram_bitmask != 0)
 
-    # Build the display text
+    # Build the display text (escape special Markdown characters in username)
+    safe_user_name = escape_markdown(overseerr_user_name)
+    
     text = (
         "🔔 *Notification Settings*\n"
         "Manage how Overseerr sends you updates via Telegram.\n\n"
         f"👤 *User Information:*\n"
-        f"   - Name: *{overseerr_user_name}* (ID: `{overseerr_telegram_user_id}`)\n\n"
+        f"   - Name: *{safe_user_name}* (ID: `{overseerr_telegram_user_id}`)\n\n"
         "⚙️ *Current Telegram Settings:*\n"
         f"   - Notifications: {'*Enabled* ✅' if telegram_is_enabled else '*Disabled* ❌'}\n"
         f"   - Silent Mode: {'*On* 🤫' if telegram_silent else '*Off* 🔊'}\n\n"
@@ -758,7 +834,7 @@ async def show_manage_notifications_menu(query: CallbackQuery, context: ContextT
     keyboard.append([InlineKeyboardButton("⬅️ Back to Settings", callback_data="back_to_settings")])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text(text, parse_mode="Markdown", reply_markup=reply_markup)
+    await safe_edit_message(query, text, parse_mode="Markdown", reply_markup=reply_markup)
 
 async def toggle_user_notifications(query: CallbackQuery, context: ContextTypes.DEFAULT_TYPE):
     """Toggle user notifications on/off."""
@@ -778,18 +854,26 @@ async def toggle_user_notifications(query: CallbackQuery, context: ContextTypes.
     notification_types = current_settings.get("notificationTypes", {})
     telegram_bitmask = notification_types.get("telegram", 0)
     
-    # If enabled (> 0), disable (set to 0). If disabled (0), enable (set to default value)
+    # If enabled (> 0), disable (set to 0). If disabled (0), enable (set to same as email notifications)
     if telegram_bitmask > 0:
         new_bitmask = 0  # Disable
         action = "disabled"
     else:
-        new_bitmask = 6  # Enable with default bitmask (Request Approved + Request Available)
+        # Use same bitmask as email notifications, or 8190 as fallback (comprehensive notifications)
+        email_bitmask = notification_types.get("email", 8190)
+        new_bitmask = email_bitmask if email_bitmask > 0 else 8190
         action = "enabled"
 
     # Update the setting
+    bot_info = await context.bot.get_me()
     success = update_telegram_settings_for_user(
-        overseerr_telegram_user_id, 
-        telegram_bitmask=new_bitmask
+        overseerr_user_id=overseerr_telegram_user_id,
+        telegram_enabled=(new_bitmask > 0),
+        telegram_bot_username=bot_info.username,
+        telegram_bot_api=context.bot.token,
+        telegram_chat_id=str(query.message.chat_id),
+        telegram_send_silently=False,
+        notification_types_bitmask=new_bitmask
     )
     
     if success:
@@ -818,10 +902,20 @@ async def toggle_user_silent(query: CallbackQuery, context: ContextTypes.DEFAULT
     new_silent = not current_silent
     action = "enabled" if new_silent else "disabled"
 
-    # Update the setting
+    # Get current notification settings for complete update
+    notification_types = current_settings.get("notificationTypes", {})
+    telegram_bitmask = notification_types.get("telegram", 0)
+
+    # Update the setting with all required parameters
+    bot_info = await context.bot.get_me()
     success = update_telegram_settings_for_user(
-        overseerr_telegram_user_id, 
-        telegram_silent=new_silent
+        overseerr_user_id=overseerr_telegram_user_id,
+        telegram_enabled=current_settings.get("telegramEnabled", True),
+        telegram_bot_username=bot_info.username,
+        telegram_bot_api=context.bot.token,
+        telegram_chat_id=str(query.message.chat_id),
+        telegram_send_silently=new_silent,
+        notification_types_bitmask=telegram_bitmask
     )
     
     if success:
@@ -902,15 +996,20 @@ async def handle_tv_anime_selection(query: CallbackQuery, context: ContextTypes.
     }
 
     # Make ONE request with ALL selected seasons
-    success, msg = request_media(
-        media_id=pending["media_id"],
-        media_type=pending["media_type"],
-        requested_by=requested_by,
-        is4k=False,
-        session_cookie=session_cookie,
-        seasons=pending["seasons"],  # Pass the list of all seasons
-        **extra_opts
-    )
+    try:
+        logger.info(f"Making request for {pending['title']} with seasons: {pending['seasons']}")
+        success, msg = request_media(
+            media_id=pending["media_id"],
+            media_type=pending["media_type"],
+            requested_by=requested_by,
+            is4k=False,
+            session_cookie=session_cookie,
+            seasons=pending["seasons"],  # Pass the list of all seasons
+            **extra_opts
+        )
+    except Exception as e:
+        logger.error(f"Error in request_media: {e}")
+        success, msg = False, f"Request failed with error: {str(e)}"
 
     # Clear the season selections
     context.user_data.pop("selected_seasons", [])

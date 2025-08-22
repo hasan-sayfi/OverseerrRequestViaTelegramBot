@@ -64,6 +64,9 @@ async def show_settings_menu(update_or_query, context: ContextTypes.DEFAULT_TYPE
     context.user_data.pop("overseerr_telegram_user_id", None)
     context.user_data.pop("overseerr_user_name", None)
     context.user_data.pop("session_data", None)
+    # Clear any previous media selection data to avoid conflicts
+    context.user_data.pop("selected_result", None)
+    context.user_data.pop("search_results", None)
 
     if CURRENT_MODE == BotMode.NORMAL:
         session_data = load_user_session(telegram_user_id)
@@ -148,7 +151,22 @@ async def show_settings_menu(update_or_query, context: ContextTypes.DEFAULT_TYPE
     if isinstance(update_or_query, Update):
         await send_message(context, chat_id, text, reply_markup=reply_markup, message_thread_id=message_thread_id)
     else:
-        await update_or_query.edit_message_text(text, parse_mode="Markdown", reply_markup=reply_markup)
+        # Use safe_edit_message instead of direct edit
+        try:
+            if hasattr(update_or_query, 'edit_message_text'):
+                # It's a query object
+                from .callback_handlers import safe_edit_message
+                await safe_edit_message(update_or_query, text, parse_mode="Markdown", reply_markup=reply_markup)
+            else:
+                # It's an update object, send new message
+                await update_or_query.message.reply_text(text, parse_mode="Markdown", reply_markup=reply_markup)
+        except Exception as e:
+            logger.error(f"Error showing settings menu: {e}")
+            # Fallback
+            if hasattr(update_or_query, 'message'):
+                await update_or_query.message.reply_text(text, parse_mode="Markdown", reply_markup=reply_markup)
+            else:
+                await update_or_query.edit_message_text(text, parse_mode="Markdown", reply_markup=reply_markup)
 
 async def display_results_with_buttons(update, context: ContextTypes.DEFAULT_TYPE, results, offset=0, search_query="", telegram_user_id=None):
     """
