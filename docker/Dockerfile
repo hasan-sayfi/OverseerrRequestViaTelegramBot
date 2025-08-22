@@ -11,9 +11,19 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 # Copy application code
 COPY . /app
 
+# Create data directory for persistent storage
+RUN mkdir -p /app/data
+
 # Create a non-root user for security
 RUN useradd -m appuser && chown -R appuser:appuser /app
 USER appuser
 
-# Run the beta script
-CMD ["python", "telegram_overseerr_bot.py"]
+# Set Python path to include the app directory
+ENV PYTHONPATH=/app
+
+# Health check to ensure the bot is running
+HEALTHCHECK --interval=60s --timeout=10s --start-period=5s --retries=3 \
+  CMD python -c "import os; exit(0 if os.path.exists('/app/data/bot_health.txt') else 1)" || exit 1
+
+# Run the modular bot
+CMD ["python", "bot.py"]

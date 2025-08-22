@@ -1,0 +1,10 @@
+# bot_config.py.template
+# Copy this file to bot_config.py and fill in your actual values
+
+OVERSEERR_API_URL = 'http://your-overseerr-instance:5055/api/v1'
+OVERSEERR_API_KEY = 'your-overseerr-api-key-here'
+TELEGRAM_TOKEN = 'your-telegram-bot-token-here'
+
+# Access Control Configuration
+# Set a password to protect access. If empty, no access control is applied.
+PASSWORD = "your-password-here"  # or "" for no access control
