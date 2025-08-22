@@ -1,0 +1,97 @@
+# Git files
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+README.md
+*.md
+
+# Python cache
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+build
+develop-eggs
+dist
+downloads
+eggs
+.eggs
+lib
+lib64
+parts
+sdist
+var
+wheels
+*.egg-info
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.env
+.venv
+env
+venv
+ENV
+env.bak
+venv.bak
+
+# IDE files
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Local data and configs (will be mounted as volumes)
+data/
+bot_config.py
+overseerr_sessions.json
+user_selections.json
+shared_session.json
+notification_settings.json
+
+# Docker files (not needed in image)
+docker-compose.yml
+docker-compose.*.yml
+Dockerfile.dev
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+
+# Migration script (deprecated)
+migrate.py
+
+# Development and testing files
+test_*
+*_test.py
+tests/
+.pytest_cache
+.coverage
+htmlcov/
+
+# Node modules (if any)
+node_modules/
+npm-debug.log*
+
+# License file (keep minimal)
+# LICENSE is kept for attribution
