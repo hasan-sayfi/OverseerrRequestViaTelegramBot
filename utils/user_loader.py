@@ -23,9 +23,9 @@ async def user_data_loader(update: Update, context: ContextTypes.DEFAULT_TYPE):
         session_data = load_user_session(telegram_user_id)
         if session_data and "cookie" in session_data:
             context.user_data["session_data"] = session_data
-            context.user_data["overseerr_user_id"] = session_data["overseerr_user_id"]
+            context.user_data["overseerr_user_id"] = session_data["overseerr_telegram_user_id"]  # Fixed key name
             context.user_data["overseerr_user_name"] = session_data.get("overseerr_user_name", "Unknown")
-            logger.info(f"Loaded Normal mode session for user {telegram_user_id}: {session_data['overseerr_user_id']}")
+            logger.info(f"Loaded Normal mode session for user {telegram_user_id}: {session_data['overseerr_telegram_user_id']}")
 
     # API mode: Load user selection
     elif CURRENT_MODE == BotMode.API:
@@ -40,6 +40,6 @@ async def user_data_loader(update: Update, context: ContextTypes.DEFAULT_TYPE):
         shared_session = load_shared_session()
         if shared_session and "cookie" in shared_session:
             context.application.bot_data["shared_session"] = shared_session
-            context.user_data["overseerr_user_id"] = shared_session["overseerr_user_id"]
+            context.user_data["overseerr_user_id"] = shared_session["overseerr_telegram_user_id"]  # Fixed key name
             context.user_data["overseerr_user_name"] = shared_session.get("overseerr_user_name", "Shared User")
-            logger.info(f"Loaded Shared mode session for user {telegram_user_id}: {shared_session['overseerr_user_id']}")
+            logger.info(f"Loaded Shared mode session for user {telegram_user_id}: {shared_session['overseerr_telegram_user_id']}")
