@@ -69,6 +69,16 @@ REFACTORING_SUMMARY.md
 # Development backup files
 *.bak
 
+# Docker development scripts (keep local)
+docker/quick-docker.sh
+docker/quick-docker.bat
+docker/bump-version.sh
+docker/bump-version.bat
+docker/verify-docker-hub.sh
+docker/docker-build.sh
+docker/docker-build.bat
+docker/build-bug-fix-release.sh
+
 ##################################################
 # Project Specific
 ##################################################
