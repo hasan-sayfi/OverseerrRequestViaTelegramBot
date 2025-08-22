@@ -57,6 +57,32 @@ def save_user_sessions(sessions):
         json.dump(sessions, f, indent=2)
     logger.info("Saved user sessions")
 
+def clear_user_session(telegram_user_id: int):
+    """Remove a user's session from persistent storage."""
+    try:
+        # Load all sessions
+        try:
+            with open(USER_SESSIONS_FILE, "r", encoding="utf-8") as f:
+                all_sessions = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            logger.info("No sessions file found, nothing to clear")
+            return
+
+        # Remove the specific user's session
+        user_id_str = str(telegram_user_id)
+        if user_id_str in all_sessions:
+            del all_sessions[user_id_str]
+            
+            # Save back to file
+            with open(USER_SESSIONS_FILE, "w", encoding="utf-8") as f:
+                json.dump(all_sessions, f, indent=2)
+            logger.info(f"Cleared persistent session for user {telegram_user_id}")
+        else:
+            logger.info(f"No persistent session found for user {telegram_user_id}")
+            
+    except Exception as e:
+        logger.error(f"Error clearing session for user {telegram_user_id}: {e}")
+
 ###############################################################################
 #                        SHARED MODE SESSION MANAGEMENT
 ###############################################################################
