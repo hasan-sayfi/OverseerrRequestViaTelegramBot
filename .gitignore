@@ -48,6 +48,114 @@ htmlcov/
 .coverage
 .coverage.*
 .cache
+
+##################################################
+# Development and Documentation Files
+##################################################
+
+# Development configuration files
+bot_config.py
+telegram_overseerr_bot.py
+
+# Development documentation and notes
+AUTOMATIC-VERSION-BUILD.md
+README_REFACTORED.md
+VERSION-MANAGEMENT.md
+REFACTORING_SUMMARY.md
+
+# Development issue tracking and fix documentation
+ISSUES_ACTUALLY_FIXED.md
+ISSUES_FIXED_FINAL.md
+ISSUES_FIXED_SUMMARY.md
+NOTIFICATIONS_SETUP.md
+NOTIFICATION_BITMASK_FIX.md
+SILENT_MODE_FIX.md
+TELEGRAM_MESSAGE_FIXES.md
+
+# Development test files
+test_setup.py
+
+# Development workspace files
+*.code-workspace
+
+# Development backup files
+*.bak
+
+# Docker development scripts (keep local)
+docker/quick-docker.sh
+docker/quick-docker.bat
+docker/bump-version.sh
+docker/bump-version.bat
+docker/verify-docker-hub.sh
+docker/docker-build.sh
+docker/docker-build.bat
+docker/build-bug-fix-release.sh
+
+# Development scripts in root (keep local)
+quick-docker.sh
+quick-docker.bat
+bump-version.sh
+bump-version.bat
+verify-docker-hub.sh
+docker-build.sh
+docker-build.bat
+build-bug-fix-release.sh
+
+# Development documentation (keep local)
+DOCKER-HUB-DEPLOY.md
+DOCKER.md
+
+# Temporary development directories
+temp_dev_files/
+
+##################################################
+# Project Specific
+##################################################
+
+# Environment files
+.env
+.env.local
+.env.production
+.env.development
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Bot specific
+bot_config.json
+data/*.json
+logs/
+*.log
+
+# Docker build context
+.dockerignore
+
+# Temporary documentation files
+*_TEMP.md
+*_DRAFT.md
+TEMP_*.md
+
+# VS Code workspace (optional, remove if you want to track it)
+*.code-workspace
 nosetests.xml
 coverage.xml
 *.cover
