@@ -48,6 +48,75 @@ htmlcov/
 .coverage
 .coverage.*
 .cache
+
+##################################################
+# Development and Documentation Files
+##################################################
+
+# Development configuration files
+bot_config.py
+telegram_overseerr_bot.py
+
+# Development documentation and notes
+AUTOMATIC-VERSION-BUILD.md
+README_REFACTORED.md
+VERSION-MANAGEMENT.md
+REFACTORING_SUMMARY.md
+
+# Development workspace files
+*.code-workspace
+
+# Development backup files
+*.bak
+
+##################################################
+# Project Specific
+##################################################
+
+# Environment files
+.env
+.env.local
+.env.production
+.env.development
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Bot specific
+bot_config.json
+data/*.json
+logs/
+*.log
+
+# Docker build context
+.dockerignore
+
+# Temporary documentation files
+*_TEMP.md
+*_DRAFT.md
+TEMP_*.md
+
+# VS Code workspace (optional, remove if you want to track it)
+*.code-workspace
 nosetests.xml
 coverage.xml
 *.cover
@@ -182,5 +251,51 @@ pyrightconfig.json
 # Specific to project
 ##################################################
 
+# Data directory (contains user data, sessions, and bot state)
+data/
 data
+
+# Configuration files with sensitive data
 /config.py
+bot_config.py
+.env
+.env.local
+.env.production
+.env.development
+
+# Backup files from refactoring
+telegram_overseerr_bot_backup_*.py
+
+# Log files
+*.log
+logs/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Docker volumes and data
+docker-data/
+volumes/
+
+# Bot-specific files
+bot_config.py
+overseerr_sessions.json
+user_selections.json
+shared_session.json
+notification_settings.json
+
+# Migration scripts (no longer needed)
+migrate.py
