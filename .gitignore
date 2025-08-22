@@ -91,6 +91,23 @@ docker/docker-build.sh
 docker/docker-build.bat
 docker/build-bug-fix-release.sh
 
+# Development scripts in root (keep local)
+quick-docker.sh
+quick-docker.bat
+bump-version.sh
+bump-version.bat
+verify-docker-hub.sh
+docker-build.sh
+docker-build.bat
+build-bug-fix-release.sh
+
+# Development documentation (keep local)
+DOCKER-HUB-DEPLOY.md
+DOCKER.md
+
+# Temporary development directories
+temp_dev_files/
+
 ##################################################
 # Project Specific
 ##################################################
