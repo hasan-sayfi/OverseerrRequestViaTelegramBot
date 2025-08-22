@@ -39,12 +39,12 @@ async def set_global_telegram_notifications(update, context):
 
     payload = {
         "enabled": True,
-        "types": 1,  # Disable all notification types (except silent)
+        "types": 2047,  # Enable all notification types (bitmask for all types)
         "options": {
             "botUsername": bot_info.username,  # Botname
             "botAPI": TELEGRAM_TOKEN,          # Telegram Token
             "chatId": chat_id,                 # Chat-ID - i guess the admin will use the bot first?
-            "sendSilently": True
+            "sendSilently": False              # Don't send silently so users see notifications
         }
     }
     try:
@@ -103,7 +103,8 @@ def update_telegram_settings_for_user(
     telegram_bot_username: str,
     telegram_bot_api: str,
     telegram_chat_id: str,
-    telegram_send_silently: bool
+    telegram_send_silently: bool,
+    notification_types_bitmask: int = 0
 ) -> bool:
     """
     Updates the Telegram notification settings for a specific Overseerr user.
@@ -114,7 +115,10 @@ def update_telegram_settings_for_user(
         "telegramBotUsername": telegram_bot_username,
         "telegramBotAPI": telegram_bot_api,
         "telegramChatId": telegram_chat_id,
-        "telegramSendSilently": telegram_send_silently
+        "telegramSendSilently": telegram_send_silently,
+        "notificationTypes": {
+            "telegram": notification_types_bitmask
+        }
     }
 
     try:
