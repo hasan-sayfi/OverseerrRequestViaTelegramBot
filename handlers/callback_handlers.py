@@ -642,7 +642,7 @@ async def handle_back_to_results(query: CallbackQuery, context: ContextTypes.DEF
             search_query=search_query, telegram_user_id=query.from_user.id
         )
     else:
-        await query.edit_message_text("❌ No search results to return to.")
+        await safe_edit_message(query, "❌ No search results to return to.")
 
 async def handle_season_toggle(query: CallbackQuery, context: ContextTypes.DEFAULT_TYPE, media_id: int, season_num: int):
     """Handle season selection toggle."""
