@@ -167,8 +167,8 @@ def request_media(media_id: int, media_type: str, requested_by: int = None, is4k
         payload["userId"] = requested_by
     
     if media_type == "tv":
-        if seasons == "all":
-            payload["seasons"] = seasons
+        if seasons == "all" or seasons is None:
+            payload["seasons"] = "all"
         elif isinstance(seasons, list):
             payload["seasons"] = [int(s) for s in seasons]  # Handle list of seasons
         else:
