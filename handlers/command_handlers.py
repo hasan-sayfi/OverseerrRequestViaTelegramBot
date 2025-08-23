@@ -9,7 +9,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
 from config.config_manager import load_config, save_config, is_command_allowed
-from config.constants import PASSWORD, CURRENT_MODE, BotMode, VERSION, BUILD
+from config.constants import PASSWORD, CURRENT_MODE, BotMode, VERSION
 from session.session_manager import save_user_session, load_user_sessions, save_user_sessions, save_shared_session
 from utils.telegram_utils import send_message
 from api.overseerr_api import overseerr_login, search_media, process_search_results
@@ -77,7 +77,6 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Show welcome message
     welcome_text = f"🎬 *Welcome to Overseerr Telegram Bot!*\n\n"
     welcome_text += f"📱 *Version:* {VERSION}\n"
-    welcome_text += f"🔧 *Build:* {BUILD}\n\n"
     welcome_text += f"🎯 *Current Mode:* {CURRENT_MODE.value.title()}\n\n"
     welcome_text += "📚 *Available Commands:*\n"
     welcome_text += "• `/check <title>` - Search for movies/TV shows\n"

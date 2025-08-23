@@ -14,9 +14,6 @@ COPY . /app
 # Create data directory for persistent storage
 RUN mkdir -p /app/data
 
-# Make health check script executable
-RUN chmod +x /app/scripts/health_check.py
-
 # Create a non-root user for security
 RUN useradd -m appuser && chown -R appuser:appuser /app
 USER appuser
@@ -24,9 +21,15 @@ USER appuser
 # Set Python path to include the app directory
 ENV PYTHONPATH=/app
 
-# Health check using dedicated script
+# Health check to ensure the bot is running and healthy
 HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \
-  CMD python /app/scripts/health_check.py || exit 1
+  CMD python -c " \
+import os, sys, time; \
+health_file = '/app/data/bot_health.txt'; \
+if not os.path.exists(health_file): sys.exit(1); \
+mtime = os.path.getmtime(health_file); \
+if time.time() - mtime > 120: sys.exit(1); \
+sys.exit(0)" || exit 1
 
 # Run the modular bot
 CMD ["python", "bot.py"]
