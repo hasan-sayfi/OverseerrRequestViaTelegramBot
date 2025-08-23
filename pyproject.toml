@@ -35,4 +35,3 @@ allow_dirty = true
 filename = "pyproject.toml"
 search = 'version = "{current_version}"'
 replace = 'version = "{new_version}"'
-
