@@ -9,6 +9,9 @@ Build: 2025.08.22.0750
 
 import logging
 import os
+import atexit
+import signal
+import sys
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -29,6 +32,7 @@ from config.constants import VERSION, BUILD, TELEGRAM_TOKEN, CURRENT_MODE, BotMo
 from config.config_manager import ensure_data_directory, load_config
 from session.session_manager import load_shared_session
 from utils.user_loader import user_data_loader
+from utils.health_check import health_checker
 from handlers.command_handlers import start_command, check_media
 from handlers.text_handlers import handle_text_input
 from handlers.ui_handlers import show_settings_menu
@@ -39,9 +43,23 @@ logger.info(f"Bot Version: {VERSION} BUILD: {BUILD}")
 # Ensure data directory exists
 os.makedirs("data", exist_ok=True)
 
+def signal_handler(signum, frame):
+    """Handle shutdown signals gracefully."""
+    logger.info(f"Received signal {signum}, shutting down gracefully...")
+    health_checker.stop_health_monitor()
+    health_checker.cleanup_health_file()
+    sys.exit(0)
+
 def main():
     """Main entry point for the bot."""
     global CURRENT_MODE
+    
+    # Register signal handlers for graceful shutdown
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    
+    # Register cleanup function for normal exits
+    atexit.register(lambda: (health_checker.stop_health_monitor(), health_checker.cleanup_health_file()))
     
     ensure_data_directory()
     config = load_config()
@@ -54,6 +72,10 @@ def main():
         CURRENT_MODE = BotMode.NORMAL
     
     logger.info(f"Bot started in mode: {CURRENT_MODE.value}")
+
+    # Start health monitoring
+    health_checker.start_health_monitor()
+    logger.info("Health monitoring started")
 
     # Build the application
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()

@@ -21,9 +21,15 @@ USER appuser
 # Set Python path to include the app directory
 ENV PYTHONPATH=/app
 
-# Health check to ensure the bot is running
-HEALTHCHECK --interval=60s --timeout=10s --start-period=5s --retries=3 \
-  CMD python -c "import os; exit(0 if os.path.exists('/app/data/bot_health.txt') else 1)" || exit 1
+# Health check to ensure the bot is running and healthy
+HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \
+  CMD python -c " \
+import os, sys, time; \
+health_file = '/app/data/bot_health.txt'; \
+if not os.path.exists(health_file): sys.exit(1); \
+mtime = os.path.getmtime(health_file); \
+if time.time() - mtime > 120: sys.exit(1); \
+sys.exit(0)" || exit 1
 
 # Run the modular bot
 CMD ["python", "bot.py"]
