@@ -20,6 +20,8 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
+          # Ensure we can write to the repository
+          persist-credentials: true
       
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -29,22 +31,39 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
+          # Install project dependencies first
+          pip install python-dotenv
           # Install compatible versions for both tools
           pip install "httpx>=0.28.1"  # For bump-my-version
           pip install bump-my-version
           
-          # Validate installation
+          # Validate installation and project imports
           echo "✅ Validating bump-my-version installation..."
           bump-my-version --version || { echo "❌ bump-my-version installation failed"; exit 1; }
+          
+          echo "✅ Validating project imports..."
+          python -c "from utils.version import VERSION; print(f'Current version: {VERSION}')" || { echo "❌ utils.version import failed"; exit 1; }
       
       - name: Configure Git
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Verify we're already on main (should be after PR merge)
+          CURRENT_BRANCH=$(git branch --show-current)
+          if [[ "$CURRENT_BRANCH" != "main" ]]; then
+            echo "⚠️ Not on main branch, switching..."
+            git checkout main
+            git pull origin main
+          else
+            echo "✅ Already on main branch"
+          fi
           
           # Validate git configuration
           echo "✅ Git user: $(git config user.name)"
           echo "✅ Git email: $(git config user.email)"
+          echo "✅ Current branch: $(git branch --show-current)"
+          echo "✅ Latest commit: $(git log --oneline -1)"
       
       # Determine version bump type from PR labels or commit messages
       - name: Determine version bump type
@@ -79,8 +98,32 @@ jobs:
           
           # Perform the version bump with error checking
           echo "🚀 Bumping ${{ steps.version-type.outputs.bump_type }} version..."
-          if ! bump-my-version bump ${{ steps.version-type.outputs.bump_type }}; then
-            echo "❌ Version bump failed!"
+          
+          # Check if target version tag already exists (prevent conflicts)
+          case "${{ steps.version-type.outputs.bump_type }}" in
+            "major")
+              NEXT_VERSION=$(echo $CURRENT_VERSION | awk -F. '{print ($1+1)".0.0"}') ;;
+            "minor") 
+              NEXT_VERSION=$(echo $CURRENT_VERSION | awk -F. '{print $1"."($2+1)".0"}') ;;
+            "patch")
+              NEXT_VERSION=$(echo $CURRENT_VERSION | awk -F. '{print $1"."$2"."($3+1)}') ;;
+          esac
+          
+          if git tag | grep -q "^v$NEXT_VERSION$"; then
+            echo "⚠️ Tag v$NEXT_VERSION already exists, cleaning up..."
+            git tag -d "v$NEXT_VERSION" || true
+            git push origin ":refs/tags/v$NEXT_VERSION" || true
+          fi
+          
+          # Use bump-my-version with explicit configuration and error handling
+          if ! bump-my-version bump ${{ steps.version-type.outputs.bump_type }} \
+            --config-file pyproject.toml \
+            --verbose; then
+            echo "❌ bump-my-version failed! Checking state..."
+            echo "Git status:" 
+            git status
+            echo "Recent commits:"
+            git log --oneline -3
             exit 1
           fi
           
@@ -100,20 +143,15 @@ jobs:
           # Get the new version for logging
           NEW_VERSION=$(python -c "from utils.version import VERSION; print(VERSION)")
           
-          # Check if there are changes to commit
-          if git diff --staged --quiet && git diff --quiet; then
-            echo "❌ No changes detected after version bump!"
-            exit 1
-          fi
-          
-          # Validate that we have a commit ready
+          # Validate that we have a version bump commit (bump-my-version already committed)
           if ! git log --oneline -1 | grep -q "Bump version:"; then
             echo "❌ No version bump commit found!"
+            echo "Recent commits:"
             git log --oneline -3
             exit 1
           fi
           
-          echo "✅ Version bump commit verified"
+          echo "✅ Version bump commit verified: $(git log --oneline -1)"
           
           # Push the commit with error checking
           echo "📤 Pushing version commit to main..."
