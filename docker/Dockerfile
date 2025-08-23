@@ -18,18 +18,18 @@ RUN mkdir -p /app/data
 RUN useradd -m appuser && chown -R appuser:appuser /app
 USER appuser
 
-# Set Python path and environment variables
+# Set Python path to include the app directory
 ENV PYTHONPATH=/app
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONDONTWRITEBYTECODE=1
 
-# Set network timeout environment variables for better connectivity
-ENV PYTHONHTTPSVERIFY=0
-ENV HTTPX_LOG_LEVEL=WARNING
-
-# Health check to ensure the bot is running
-HEALTHCHECK --interval=60s --timeout=10s --start-period=5s --retries=3 \
-  CMD python -c "import os; exit(0 if os.path.exists('/app/data/bot_health.txt') else 1)" || exit 1
+# Health check to ensure the bot is running and healthy
+HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \
+  CMD python -c " \
+import os, sys, time; \
+health_file = '/app/data/bot_health.txt'; \
+if not os.path.exists(health_file): sys.exit(1); \
+mtime = os.path.getmtime(health_file); \
+if time.time() - mtime > 120: sys.exit(1); \
+sys.exit(0)" || exit 1
 
 # Run the modular bot
 CMD ["python", "bot.py"]
