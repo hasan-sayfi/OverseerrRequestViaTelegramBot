@@ -1,0 +1,152 @@
+name: Build and Push Docker Image
+
+# Trigger the workflow on:
+# 1. Version tags (v*) - when auto-version creates tags
+# 2. Manual workflow dispatch for testing
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:  # Allows manual triggering
+
+# Define environment variables
+env:
+  DOCKER_IMAGE_NAME: overseerr-telegram-bot
+  REGISTRY: docker.io
+
+jobs:
+  # Job 1: Build and push Docker image
+  docker-build-push:
+    # Only run for version tags or manual dispatch
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    
+    runs-on: ubuntu-latest
+    
+    steps:
+      # Step 1: Checkout the repository code
+      - name: 🛒 Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0  # Fetch all history for version detection
+      
+      # Step 2: Set up Python to read version from pyproject.toml
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      
+      # Step 3: Install dependencies to read version
+      - name: 📦 Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install toml
+      
+      # Step 4: Extract version from pyproject.toml
+      - name: 🏷️ Extract version from pyproject.toml
+        id: get_version
+        run: |
+          # Validate pyproject.toml exists
+          if [[ ! -f "pyproject.toml" ]]; then
+            echo "❌ pyproject.toml not found!"
+            exit 1
+          fi
+          
+          # Extract version with error checking
+          if ! VERSION=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])"); then
+            echo "❌ Failed to extract version from pyproject.toml!"
+            exit 1
+          fi
+          
+          # Validate version format
+          if [[ ! $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "❌ Invalid version format: $VERSION"
+            exit 1
+          fi
+          
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "📋 Detected version: $VERSION"
+          echo "✅ Version validation successful"
+      
+      # Step 5: Set up Docker Buildx (for multi-platform builds)
+      - name: 🔧 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      # Step 6: Login to Docker Hub using secrets
+      - name: 🔐 Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      
+      # Step 6.5: Validate Docker Hub credentials
+      - name: ✅ Validate Docker Hub connection
+        run: |
+          echo "🔍 Testing Docker Hub connection..."
+          if ! docker buildx imagetools inspect alpine:latest > /dev/null 2>&1; then
+            echo "❌ Docker Hub connection failed!"
+            exit 1
+          fi
+          echo "✅ Docker Hub connection successful"
+      
+      # Step 7: Extract metadata for Docker tags and labels
+      - name: 🏷️ Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}
+          tags: |
+            # Tag with version number (e.g., 4.1.4)
+            type=raw,value=${{ steps.get_version.outputs.VERSION }}
+            # Tag with "latest" for main branch and version tags
+            type=raw,value=latest,enable={{is_default_branch}}
+            # Tag with git tag if it's a version tag (e.g., v4.1.4)
+            type=ref,event=tag
+          labels: |
+            org.opencontainers.image.title=Overseerr Telegram Bot
+            org.opencontainers.image.description=A Telegram bot for interacting with Overseerr media requests
+            org.opencontainers.image.version=${{ steps.get_version.outputs.VERSION }}
+            org.opencontainers.image.vendor=hasan-sayfi
+      
+      # Step 8: Build and push Docker image
+      - name: 🏗️ Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64  # Single platform for faster builds
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha  # Use GitHub Actions cache
+          cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ steps.get_version.outputs.VERSION }}
+      
+      # Step 9: Display build summary
+      - name: 📊 Build Summary
+        if: success()  # Only run if build succeeded
+        run: |
+          echo "## 🚀 Docker Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Version** | \`${{ steps.get_version.outputs.VERSION }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Image Name** | \`${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Tags** | \`${{ steps.get_version.outputs.VERSION }}\`, \`latest\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Platforms** | linux/amd64 |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Trigger** | ${{ github.event_name }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **Image successfully built and pushed to Docker Hub!**" >> $GITHUB_STEP_SUMMARY
+          
+      # Step 10: Failure notification
+      - name: ❌ Build Failed Notification
+        if: failure()  # Only run if any step failed
+        run: |
+          echo "## ❌ Docker Build Failed" >> $GITHUB_STEP_SUMMARY
+          echo "The Docker build process encountered an error." >> $GITHUB_STEP_SUMMARY
+          echo "Please check the workflow logs for details." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Common causes:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Docker Hub credentials invalid" >> $GITHUB_STEP_SUMMARY
+          echo "- Dockerfile syntax errors" >> $GITHUB_STEP_SUMMARY
+          echo "- Missing dependencies in requirements.txt" >> $GITHUB_STEP_SUMMARY
+          echo "- Version format issues" >> $GITHUB_STEP_SUMMARY
