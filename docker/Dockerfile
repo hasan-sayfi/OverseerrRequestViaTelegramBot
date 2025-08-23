@@ -18,14 +18,8 @@ RUN mkdir -p /app/data
 RUN useradd -m appuser && chown -R appuser:appuser /app
 USER appuser
 
-# Set Python path and environment variables
+# Set Python path to include the app directory
 ENV PYTHONPATH=/app
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONDONTWRITEBYTECODE=1
-
-# Set network timeout environment variables for better connectivity
-ENV PYTHONHTTPSVERIFY=0
-ENV HTTPX_LOG_LEVEL=WARNING
 
 # Health check to ensure the bot is running
 HEALTHCHECK --interval=60s --timeout=10s --start-period=5s --retries=3 \

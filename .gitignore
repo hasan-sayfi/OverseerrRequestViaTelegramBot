@@ -101,6 +101,10 @@ docker-build.sh
 docker-build.bat
 build-bug-fix-release.sh
 
+# Development git scripts (keep local)
+scripts
+scripts/*
+
 # Development documentation (keep local)
 DOCKER-HUB-DEPLOY.md
 DOCKER.md
