@@ -20,6 +20,8 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
+          # Ensure we can write to the repository
+          persist-credentials: true
       
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -39,12 +41,17 @@ jobs:
       
       - name: Configure Git
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Ensure we're on the right branch
+          git checkout main
+          git pull origin main
           
           # Validate git configuration
           echo "✅ Git user: $(git config user.name)"
           echo "✅ Git email: $(git config user.email)"
+          echo "✅ Current branch: $(git branch --show-current)"
       
       # Determine version bump type from PR labels or commit messages
       - name: Determine version bump type
@@ -79,10 +86,11 @@ jobs:
           
           # Perform the version bump with error checking
           echo "🚀 Bumping ${{ steps.version-type.outputs.bump_type }} version..."
-          if ! bump-my-version bump ${{ steps.version-type.outputs.bump_type }}; then
-            echo "❌ Version bump failed!"
-            exit 1
-          fi
+          
+          # Use bump-my-version with explicit configuration
+          bump-my-version bump ${{ steps.version-type.outputs.bump_type }} \
+            --config-file pyproject.toml \
+            --verbose
           
           # Validate the new version
           NEW_VERSION=$(python -c "from utils.version import VERSION; print(VERSION)")
