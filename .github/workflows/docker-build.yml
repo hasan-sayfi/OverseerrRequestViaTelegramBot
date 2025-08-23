@@ -39,7 +39,17 @@ jobs:
       - name: 📦 Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install toml
+          # Install minimal dependencies for version reading
+          pip install python-dotenv
+          
+          # Validate version utility works
+          echo "✅ Testing version import..."
+          python -c "from utils.version import VERSION; print(f'Detected version: {VERSION}')" || {
+            echo "❌ Version import failed, trying fallback..."
+            # Fallback: extract directly from pyproject.toml
+            pip install toml
+            python -c "import toml; print(f'Fallback version: {toml.load(\"pyproject.toml\")[\"project\"][\"version\"]}')"
+          }
       
       # Step 4: Extract version from pyproject.toml
       - name: 🏷️ Extract version from pyproject.toml
@@ -51,9 +61,16 @@ jobs:
             exit 1
           fi
           
-          # Extract version with error checking
-          if ! VERSION=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])"); then
-            echo "❌ Failed to extract version from pyproject.toml!"
+          # Extract version using our version utility with fallback
+          if VERSION=$(python -c "from utils.version import VERSION; print(VERSION)" 2>/dev/null); then
+            echo "✅ Used utils.version: $VERSION"
+          elif VERSION=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])" 2>/dev/null); then
+            echo "✅ Used toml fallback: $VERSION"  
+          else
+            echo "❌ All version extraction methods failed!"
+            echo "Checking file structure..."
+            ls -la utils/ || echo "utils/ directory missing"
+            cat pyproject.toml | grep -A5 -B5 version || echo "pyproject.toml version not found"
             exit 1
           fi
           
@@ -97,9 +114,9 @@ jobs:
           tags: |
             # Tag with version number (e.g., 4.1.4)
             type=raw,value=${{ steps.get_version.outputs.VERSION }}
-            # Tag with "latest" for main branch and version tags
-            type=raw,value=latest,enable={{is_default_branch}}
-            # Tag with git tag if it's a version tag (e.g., v4.1.4)
+            # Tag with "latest" for version tags (not branch-dependent)
+            type=raw,value=latest
+            # Tag with git tag if it's a version tag (e.g., v4.1.4) 
             type=ref,event=tag
           labels: |
             org.opencontainers.image.title=Overseerr Telegram Bot
