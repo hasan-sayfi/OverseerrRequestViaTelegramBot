@@ -25,10 +25,10 @@ except ImportError:
     load_env_file()
 
 ###############################################################################
-#                              BOT VERSION
+#                              BOT VERSION & BUILD
 ###############################################################################
-# Import version information from centralized location
-from utils.version import VERSION
+VERSION = "4.1.2"
+BUILD = "2025.08.22.0750"
 
 ###############################################################################
 #                    LOAD CONFIG OR ENVIRONMENT VARIABLES

@@ -1,45 +1,69 @@
-"""
-Version management utility for Overseerr Telegram Bot.
-Reads version from pyproject.toml as the single source of truth.
-"""
+"""Version utility module for reading project version from pyproject.toml"""
+
 import os
-import sys
 from pathlib import Path
 
-def get_project_root():
-    """Get the project root directory."""
-    current_file = Path(__file__)
-    # Go up from utils/version.py to project root
-    return current_file.parent.parent
-
-def read_version_from_pyproject():
-    """Read version from pyproject.toml file."""
+def get_version():
+    """
+    Get the current version of the project from pyproject.toml.
+    
+    Returns:
+        str: The version string (e.g., "4.1.3")
+    """
     try:
-        project_root = get_project_root()
-        pyproject_path = project_root / "pyproject.toml"
+        # Try to import tomllib (Python 3.11+)
+        try:
+            import tomllib
+        except ImportError:
+            # Fallback to tomli for older Python versions
+            try:
+                import tomli as tomllib
+            except ImportError:
+                # If neither is available, try toml package
+                try:
+                    import toml
+                    
+                    # Find pyproject.toml file
+                    current_dir = Path(__file__).parent.parent
+                    pyproject_path = current_dir / "pyproject.toml"
+                    
+                    if pyproject_path.exists():
+                        with open(pyproject_path, 'r', encoding='utf-8') as f:
+                            pyproject_data = toml.load(f)
+                        return pyproject_data.get('project', {}).get('version', '0.0.0')
+                except ImportError:
+                    pass
+                
+                # Manual parsing as last resort
+                current_dir = Path(__file__).parent.parent
+                pyproject_path = current_dir / "pyproject.toml"
+                
+                if pyproject_path.exists():
+                    with open(pyproject_path, 'r', encoding='utf-8') as f:
+                        for line in f:
+                            if line.strip().startswith('version = '):
+                                # Extract version from line like: version = "4.1.3"
+                                version_str = line.split('=', 1)[1].strip()
+                                # Remove quotes
+                                version_str = version_str.strip('"\'')
+                                return version_str
+                
+                return "0.0.0"
         
-        if not pyproject_path.exists():
-            return "4.1.2"  # Fallback version
+        # Use tomllib (preferred method)
+        current_dir = Path(__file__).parent.parent
+        pyproject_path = current_dir / "pyproject.toml"
         
-        with open(pyproject_path, 'r', encoding='utf-8') as f:
-            content = f.read()
+        if pyproject_path.exists():
+            with open(pyproject_path, 'rb') as f:
+                pyproject_data = tomllib.load(f)
+            return pyproject_data.get('project', {}).get('version', '0.0.0')
         
-        # Simple parsing for version line
-        for line in content.split('\n'):
-            line = line.strip()
-            if line.startswith('version = '):
-                # Extract version from: version = "4.1.2"
-                version = line.split('=')[1].strip().strip('"\'')
-                return version
-        
-        return "4.1.2"  # Fallback if not found
+        return "0.0.0"
         
     except Exception as e:
-        print(f"Warning: Could not read version from pyproject.toml: {e}")
-        return "4.1.2"  # Fallback version
-
-# Export version information
-VERSION = read_version_from_pyproject()
+        # Fallback to hardcoded version if all else fails
+        return "4.1.3"
 
 if __name__ == "__main__":
-    print(f"Version: {VERSION}")
+    print(f"Current version: {get_version()}")

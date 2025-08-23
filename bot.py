@@ -3,7 +3,8 @@
 Overseerr Telegram Bot - Main entry point
 A Telegram bot for interacting with Overseerr media requests.
 
-Version information is loaded dynamically from pyproject.toml
+Version: 4.0.2
+Build: 2025.08.22.0750
 """
 
 import logging
@@ -27,7 +28,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Import configuration and handlers
-from config.constants import VERSION, TELEGRAM_TOKEN, CURRENT_MODE, BotMode
+from config.constants import VERSION, BUILD, TELEGRAM_TOKEN, CURRENT_MODE, BotMode
 from config.config_manager import ensure_data_directory, load_config
 from session.session_manager import load_shared_session
 from utils.user_loader import user_data_loader
@@ -37,7 +38,7 @@ from handlers.text_handlers import handle_text_input
 from handlers.ui_handlers import show_settings_menu
 from handlers.callback_handlers import button_handler
 
-logger.info(f"Bot Version: {VERSION}")
+logger.info(f"Bot Version: {VERSION} BUILD: {BUILD}")
 
 # Ensure data directory exists
 os.makedirs("data", exist_ok=True)
