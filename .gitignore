@@ -53,6 +53,10 @@ htmlcov/
 # Development and Documentation Files
 ##################################################
 
+# Docs files
+docs/
+docs/**/*.md
+
 # Development configuration files
 bot_config.py
 telegram_overseerr_bot.py
