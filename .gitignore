@@ -56,8 +56,7 @@ htmlcov/
 # Docs files
 docs/
 docs/**/*.md
-instructions/
-instructions/**/*.md
+.github/instructions/*
 
 # Development configuration files
 bot_config.py
