@@ -37,6 +37,7 @@ from handlers.command_handlers import start_command, check_media
 from handlers.text_handlers import handle_text_input
 from handlers.ui_handlers import show_settings_menu
 from handlers.callback_handlers import button_handler
+from handlers.admin_handlers import pending_requests_command, handle_admin_approval_callback
 
 logger.info(f"Bot Version: {VERSION} BUILD: {BUILD}")
 
@@ -80,6 +81,30 @@ def main():
     # Build the application
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
+    # Set up bot commands for autocomplete menu
+    async def set_bot_commands():
+        """Set up bot commands for Telegram's autocomplete menu
+        
+        Alternative manual setup via BotFather:
+        1. Message @BotFather on Telegram
+        2. Send /setcommands
+        3. Select your bot
+        4. Send this list:
+        start - Start the bot and see welcome message
+        check - Check media availability in Overseerr  
+        settings - Configure bot settings and preferences
+        pending - View pending requests (Admin only)
+        """
+        from telegram import BotCommand
+        commands = [
+            BotCommand("start", "Start the bot and see welcome message"),
+            BotCommand("check", "Check media availability in Overseerr"),
+            BotCommand("settings", "Configure bot settings and preferences"),
+            BotCommand("pending", "View pending requests (Admin only)")
+        ]
+        await app.bot.set_my_commands(commands)
+        logger.info("Bot commands set up for autocomplete menu")
+
     # Load shared session if in shared mode
     if CURRENT_MODE == BotMode.SHARED:
         shared_session = load_shared_session()
@@ -92,8 +117,17 @@ def main():
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("settings", show_settings_menu))
     app.add_handler(CommandHandler("check", check_media))
+    app.add_handler(CommandHandler("pending", pending_requests_command))  # NEW: Admin command
+    app.add_handler(CallbackQueryHandler(handle_admin_approval_callback, pattern="^admin_"))  # NEW: Admin callbacks
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_input))
+
+    # Set up bot commands using post_init hook
+    async def post_init(application):
+        """Set up bot commands after application initialization"""
+        await set_bot_commands()
+    
+    app.post_init = post_init
 
     logger.info("Starting bot polling...")
     app.run_polling()

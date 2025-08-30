@@ -272,7 +272,7 @@ async def handle_logout(query: CallbackQuery, context: ContextTypes.DEFAULT_TYPE
         
         # Clear user session data from memory
         context.user_data.pop("session_data", None)
-        context.user_data.pop("overseerr_telegram_user_id", None)
+        context.user_data.pop("overseerr_user_id", None)
         context.user_data.pop("overseerr_user_name", None)
         
         # Clear user session from persistent storage
@@ -300,7 +300,7 @@ async def handle_logout(query: CallbackQuery, context: ContextTypes.DEFAULT_TYPE
             # Clear shared session
             clear_shared_session()
             context.application.bot_data.pop("shared_session", None)
-            context.user_data.pop("overseerr_telegram_user_id", None)
+            context.user_data.pop("overseerr_user_id", None)
             context.user_data.pop("overseerr_user_name", None)
             await query.edit_message_text("🔓 Shared session logged out!")
         else:
@@ -362,7 +362,7 @@ async def _process_direct_media_request(query: CallbackQuery, context: ContextTy
     
     # Get authentication details based on mode
     session_cookie = None
-    overseerr_user_id = context.user_data.get("overseerr_telegram_user_id")
+    overseerr_user_id = context.user_data.get("overseerr_user_id")
     
     if CURRENT_MODE == BotMode.NORMAL:
         session_data = context.user_data.get("session_data")
@@ -414,7 +414,7 @@ async def handle_user_selection(query: CallbackQuery, context: ContextTypes.DEFA
     
     # Save selection
     save_user_selection(telegram_user_id, user_id, user_name)
-    context.user_data["overseerr_telegram_user_id"] = user_id
+    context.user_data["overseerr_user_id"] = user_id
     context.user_data["overseerr_user_name"] = user_name
     
     await query.edit_message_text(f"✅ Selected user: *{user_name}* (ID: {user_id})", parse_mode="Markdown")
@@ -782,7 +782,7 @@ async def show_manage_notifications_menu(query: CallbackQuery, context: ContextT
     telegram_user_id = query.from_user.id
     
     # Which Overseerr user is selected?
-    overseerr_telegram_user_id = context.user_data.get("overseerr_telegram_user_id")
+    overseerr_telegram_user_id = context.user_data.get("overseerr_user_id")
     overseerr_user_name = context.user_data.get("overseerr_user_name", "Unknown User")
 
     if not overseerr_telegram_user_id:
@@ -838,7 +838,7 @@ async def show_manage_notifications_menu(query: CallbackQuery, context: ContextT
 
 async def toggle_user_notifications(query: CallbackQuery, context: ContextTypes.DEFAULT_TYPE):
     """Toggle user notifications on/off."""
-    overseerr_telegram_user_id = context.user_data.get("overseerr_telegram_user_id")
+    overseerr_telegram_user_id = context.user_data.get("overseerr_user_id")
     
     if not overseerr_telegram_user_id:
         await query.edit_message_text("❌ No Overseerr user selected.")
@@ -885,7 +885,7 @@ async def toggle_user_notifications(query: CallbackQuery, context: ContextTypes.
 
 async def toggle_user_silent(query: CallbackQuery, context: ContextTypes.DEFAULT_TYPE):
     """Toggle silent mode on/off."""
-    overseerr_telegram_user_id = context.user_data.get("overseerr_telegram_user_id")
+    overseerr_telegram_user_id = context.user_data.get("overseerr_user_id")
     
     if not overseerr_telegram_user_id:
         await query.edit_message_text("❌ No Overseerr user selected.")
@@ -987,7 +987,7 @@ async def handle_tv_anime_selection(query: CallbackQuery, context: ContextTypes.
             return
         session_cookie = shared_session["cookie"]
     elif CURRENT_MODE == BotMode.API:
-        requested_by = context.user_data.get("overseerr_telegram_user_id", 1)
+        requested_by = context.user_data.get("overseerr_user_id", 1)
 
     # Build payload with ALL seasons in one request
     extra_opts = {
@@ -1121,7 +1121,7 @@ async def handle_individual_tv_anime_selection(query: CallbackQuery, context: Co
         if shared_session:
             session_cookie = shared_session.get("cookie")
     elif CURRENT_MODE == BotMode.API:
-        requested_by = context.user_data.get("overseerr_telegram_user_id", 1)
+        requested_by = context.user_data.get("overseerr_user_id", 1)
 
     # Build payload additions
     extra_opts = {
@@ -1186,7 +1186,7 @@ async def handle_all_tv_anime_selection(query: CallbackQuery, context: ContextTy
         if shared_session:
             session_cookie = shared_session.get("cookie")
     elif CURRENT_MODE == BotMode.API:
-        requested_by = context.user_data.get("overseerr_telegram_user_id", 1)
+        requested_by = context.user_data.get("overseerr_user_id", 1)
 
     # Build payload additions
     extra_opts = {

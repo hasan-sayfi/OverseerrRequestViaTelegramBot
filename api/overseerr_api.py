@@ -162,6 +162,7 @@ def check_session_validity(session_cookie: str) -> bool:
 def request_media(media_id: int, media_type: str, requested_by: int = None, is4k: bool = False, 
                  session_cookie: str = None, seasons: str = "all", serverId: int = None, 
                  rootFolderOverride: str = None) -> Tuple[bool, str]:
+    
     payload = {"mediaType": media_type, "mediaId": media_id, "is4k": is4k}
     if requested_by is not None:  # Only in API Mode
         payload["userId"] = requested_by
