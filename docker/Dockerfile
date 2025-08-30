@@ -1,11 +1,16 @@
-# Use a lightweight Python base image
-FROM python:3.11-slim
+# Use a lightweight Python base image with latest security patches
+FROM python:3.13-slim
 
 # Set working directory
 WORKDIR /app
 
 # Copy requirements file and install dependencies
 COPY requirements.txt /app/requirements.txt
+
+# Update setuptools to fix CVE-2024-6345 and CVE-2024-4/2/3
+RUN pip install --no-cache-dir --upgrade pip setuptools>=78.1.1
+
+# Install application dependencies
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
 # Copy application code
