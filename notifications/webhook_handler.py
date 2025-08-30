@@ -17,10 +17,14 @@ class WebhookHandler:
         self.bot = bot_instance
         self.server = None
         self.server_thread = None
+        # Initialize admin notification manager
+        from .admin_notifications import AdminNotificationManager
+        self.admin_notifier = AdminNotificationManager(bot_instance)
         
     def create_request_handler(self):
         """Create request handler class with bot instance."""
         bot = self.bot
+        admin_notifier = self.admin_notifier
         
         class OverseerrWebhookHandler(BaseHTTPRequestHandler):
             def log_message(self, format, *args):
@@ -84,6 +88,9 @@ class WebhookHandler:
                     message = webhook_data.get('message', '')
                     media = webhook_data.get('media', {})
                     request_data = webhook_data.get('request', {})
+                    
+                    # NEW: Process admin notifications for new requests
+                    await admin_notifier.process_new_request_webhook(webhook_data)
                     
                     # Extract media information
                     media_type = media.get('media_type', 'unknown')

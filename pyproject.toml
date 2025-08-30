@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "overseerr-telegram-bot"
-version = "4.1.6"
+version = "4.2.0"
 description = "A Telegram bot for interacting with Overseerr media requests"
 readme = "README.md"
 authors = [
@@ -24,7 +24,7 @@ Repository = "https://github.com/hasan-sayfi/OverseerrRequestViaTelegramBot"
 Issues = "https://github.com/hasan-sayfi/OverseerrRequestViaTelegramBot/issues"
 
 [tool.bumpversion]
-current_version = "4.1.6"
+current_version = "4.2.0"
 commit = true
 tag = true
 tag_name = "v{new_version}"

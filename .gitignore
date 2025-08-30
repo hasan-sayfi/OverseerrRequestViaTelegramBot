@@ -58,7 +58,6 @@ docs/
 docs/**/*.md
 .github/instructions/*
 
-
 # Development configuration files
 bot_config.py
 telegram_overseerr_bot.py
