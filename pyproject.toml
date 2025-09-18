@@ -30,13 +30,3 @@ tag = true
 tag_name = "v{new_version}"
 message = "Bump version: {current_version} → {new_version}"
 allow_dirty = true
-
-[[tool.bumpversion.files]]
-filename = "pyproject.toml"
-search = 'version = "4.2.1"'
-replace = 'version = "{new_version}"'
-
-[[tool.bumpversion.files]]
-filename = "pyproject.toml"
-search = 'current_version = "4.2.1"'
-replace = 'current_version = "{new_version}"'
