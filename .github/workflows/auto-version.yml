@@ -115,6 +115,11 @@ jobs:
             git push origin ":refs/tags/v$NEXT_VERSION" || true
           fi
           
+          # Debug: Show file content before bump
+          echo "=== pyproject.toml content before bump ==="
+          cat pyproject.toml | grep -A5 -B5 "version\|current_version"
+          echo "=== End file content ==="
+          
           # Use bump-my-version with explicit configuration and error handling
           if ! bump-my-version bump ${{ steps.version-type.outputs.bump_type }} \
             --config-file pyproject.toml \
