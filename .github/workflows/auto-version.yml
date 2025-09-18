@@ -208,6 +208,11 @@ jobs:
           draft: false
           prerelease: false
       
+      - name: Trigger Docker Build
+        run: |
+          echo "🐳 Triggering Docker build workflow..."
+          echo "Tag v${{ env.NEW_VERSION }} will trigger docker-build.yml automatically"
+      
       - name: Summary
         run: |
           echo "## 🎉 Auto-Release: v${{ env.NEW_VERSION }}" >> $GITHUB_STEP_SUMMARY
