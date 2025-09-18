@@ -54,8 +54,10 @@ htmlcov/
 ##################################################
 
 # Docs files
-docs/
-docs/**/*.md
+docs/BACKLOG.md
+docs/INSTALLATION.md
+docs/OVERVIEW.md
+docs/RULES.md
 instructions/
 instructions/**/*.md
 
