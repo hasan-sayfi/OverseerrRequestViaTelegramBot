@@ -292,6 +292,126 @@ async def get_tv_show_seasons(tv_show_id: int) -> List:
         logger.error(f"Error fetching seasons for TV show {tv_show_id}: {e}")
         return []
 
+async def get_tv_show_seasons_with_status(tv_show_id: int) -> List[dict]:
+    """Retrieve seasons for a TV show with detailed availability status from Overseerr."""
+    try:
+        url = f"{OVERSEERR_API_URL}/tv/{tv_show_id}"
+        response = requests.get(
+            url,
+            headers={"X-Api-Key": OVERSEERR_API_KEY},
+            timeout=10
+        )
+        response.raise_for_status()
+        data = response.json()
+        seasons = data.get("seasons", [])
+        
+        # Filter and process seasons with status information
+        detailed_seasons = []
+        for season in seasons:
+            season_num = season.get("seasonNumber", 0)
+            episode_count = season.get("episodeCount", 0)
+            
+            if season_num > 0 and episode_count > 0:
+                # Check season availability status
+                # In Overseerr, status values: 1=Unknown, 2=Pending, 3=Processing, 4=Partially Available, 5=Available
+                status = season.get("status", 1)
+                is_available = status >= 4  # Status 4 (Partially Available) or 5 (Available)
+                
+                detailed_seasons.append({
+                    "seasonNumber": season_num,
+                    "episodeCount": episode_count,
+                    "status": status,
+                    "isAvailable": is_available
+                })
+        
+        logger.info(f"Found {len(detailed_seasons)} detailed seasons for TV show {tv_show_id}")
+        return detailed_seasons
+    except requests.RequestException as e:
+        logger.error(f"Error fetching detailed seasons for TV show {tv_show_id}: {e}")
+        return []
+
+async def get_existing_requests_for_tv_show(tv_show_id: int) -> List[dict]:
+    """Get existing requests for a TV show to determine which seasons are already requested."""
+    try:
+        # Query the /request endpoint to find existing requests for this TV show
+        url = f"{OVERSEERR_API_URL}/request"
+        params = {
+            "take": 100,  # Get more results
+            "filter": "all"  # Get all request types
+        }
+        response = requests.get(
+            url,
+            headers={"X-Api-Key": OVERSEERR_API_KEY},
+            params=params,
+            timeout=10
+        )
+        response.raise_for_status()
+        data = response.json()
+        
+        # Filter requests for this specific TV show
+        tv_requests = []
+        results = data.get("results", [])
+        for request in results:
+            media = request.get("media", {})
+            if media.get("tmdbId") == tv_show_id and media.get("mediaType") == "tv":
+                tv_requests.append(request)
+        
+        logger.info(f"Found {len(tv_requests)} existing requests for TV show {tv_show_id}")
+        return tv_requests
+    except requests.RequestException as e:
+        logger.error(f"Error fetching existing requests for TV show {tv_show_id}: {e}")
+        return []
+
+async def get_requestable_seasons(tv_show_id: int) -> List[int]:
+    """Get list of season numbers that can be requested (not already requested or available)."""
+    try:
+        # Get all seasons for the TV show
+        detailed_seasons = await get_tv_show_seasons_with_status(tv_show_id)
+        if not detailed_seasons:
+            return []
+        
+        # Get existing requests to see which seasons are already requested
+        existing_requests = await get_existing_requests_for_tv_show(tv_show_id)
+        
+        # Extract requested seasons from existing requests
+        already_requested_seasons = set()
+        for request in existing_requests:
+            # Check if this request includes specific seasons
+            seasons = request.get("seasons", [])
+            if seasons:
+                # Extract season numbers from seasons data
+                for season in seasons:
+                    if isinstance(season, dict):
+                        # If season is a dict, extract the season number
+                        season_num = season.get("seasonNumber") or season.get("id") or season.get("number")
+                        if season_num:
+                            already_requested_seasons.add(season_num)
+                    elif isinstance(season, (int, str)):
+                        # If season is already a number, use it directly
+                        already_requested_seasons.add(int(season))
+            else:
+                # If no seasons specified, assume all seasons are requested
+                all_season_numbers = [s["seasonNumber"] for s in detailed_seasons]
+                already_requested_seasons.update(all_season_numbers)
+        
+        # Get all available season numbers
+        all_seasons = [season["seasonNumber"] for season in detailed_seasons]
+        
+        # Return seasons that are NOT already requested
+        requestable_seasons = [
+            season_num for season_num in all_seasons 
+            if season_num not in already_requested_seasons
+        ]
+        
+        logger.info(f"TV show {tv_show_id}: Total seasons: {len(all_seasons)}, Already requested: {sorted(already_requested_seasons)}, Requestable: {sorted(requestable_seasons)}")
+        return requestable_seasons
+        
+    except Exception as e:
+        logger.error(f"Error determining requestable seasons for TV show {tv_show_id}: {e}")
+        # Fallback: return all seasons if we can't determine request status
+        detailed_seasons = await get_tv_show_seasons_with_status(tv_show_id)
+        return [season["seasonNumber"] for season in detailed_seasons]
+
 def user_can_request_4k(overseerr_user_id: int, media_type: str) -> bool:
     """
     Check if a user has permissions to request 4K content.

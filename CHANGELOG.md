@@ -2,6 +2,31 @@
 
 All notable changes to the Overseerr Telegram Bot project since the major refactoring are documented here.
 
+## [4.3.0] - 2025-09-18
+
+### 🎬 Major Feature: Request More Seasons for TV Shows
+- **Smart Season Management**: Revolutionary TV show season requesting capabilities
+  - Intelligent season detection that identifies only requestable seasons
+  - Automatic filtering of already requested/available seasons via Overseerr API integration
+  - Selective season requesting - users can choose specific seasons to request
+  - "Request All Remaining" bulk option for efficiency
+  - Real-time request status validation to prevent duplicates
+  - Seamless integration with existing request workflow and permissions
+
+### 🔧 UI/UX Enhancements
+- **Enhanced Message Handling**: Improved bot reliability and user experience
+  - Fixed "Report Issue" button compatibility with photo messages
+  - Enhanced message editing logic for both text and caption messages
+  - Improved error handling and graceful fallbacks for UI operations
+  - Better persistence of UI state during season selection workflows
+
+### 🏗️ Technical Improvements
+- **Advanced API Integration**: Robust season status detection and request management
+  - New `/request` endpoint integration for existing request detection
+  - Enhanced season data parsing with flexible format handling
+  - Improved error handling for API communication failures
+  - Optimized request validation and duplicate prevention logic
+
 ## [4.2.1] - 2025-08-30
 
 ### 🐳 Docker Infrastructure Enhancement

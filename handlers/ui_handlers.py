@@ -13,7 +13,7 @@ from session.session_manager import (
     load_user_session, get_saved_user_for_telegram_id, load_shared_session
 )
 from utils.telegram_utils import send_message, interpret_status, can_request_resolution, is_reportable
-from api.overseerr_api import get_overseerr_users, user_can_request_4k, get_tv_show_seasons
+from api.overseerr_api import get_overseerr_users, user_can_request_4k, get_tv_show_seasons, get_requestable_seasons
 from notifications.notification_manager import get_user_notification_settings
 
 logger = logging.getLogger(__name__)
@@ -211,40 +211,64 @@ async def display_results_with_buttons(update, context: ContextTypes.DEFAULT_TYP
             results_text, parse_mode="Markdown", reply_markup=reply_markup
         )
 
-def build_media_details_message(result, context: ContextTypes.DEFAULT_TYPE, selected_seasons=None):
+async def build_media_details_message(result, context: ContextTypes.DEFAULT_TYPE, selected_seasons=None, request_more_mode=False):
     """
     Build media details message text and keyboard.
     Returns tuple of (media_text, keyboard).
+    
+    Args:
+        result: Media information dictionary
+        context: Telegram context with user data
+        selected_seasons: Set of currently selected season numbers
+        request_more_mode: If True, only show unavailable seasons and modify UI accordingly
     """
     if selected_seasons is None:
         selected_seasons = set()
     
-    # Build detailed media info
-    media_text = f"🎬 *{result['title']}* ({result['year']})\n\n"
-    media_text += f"📺 *Type:* {result['mediaType'].upper()}\n"
-    media_text += f"🗓 *Release:* {result.get('release_date_full', 'Unknown')}\n\n"
-    media_text += f"📖 *Description:*\n{result['description'][:300]}{'...' if len(result['description']) > 300 else ''}\n\n"
+    # Build detailed media info with conditional title
+    if request_more_mode:
+        media_text = f"📥 *REQUEST MORE SEASONS*\n\n"
+        media_text += f"🎬 *{result['title']}* ({result['year']})\n\n"
+        media_text += f"� *Select the seasons you want to request:*\n"
+        media_text += f"� *Tip: These are the seasons not yet available in your media server.*\n\n"
+    else:
+        media_text = f"🎬 *{result['title']}* ({result['year']})\n\n"
+        media_text += f"📺 *Type:* {result['mediaType'].upper()}\n"
+        media_text += f"🗓 *Release:* {result.get('release_date_full', 'Unknown')}\n\n"
+        media_text += f"📖 *Description:*\n{result['description'][:300]}{'...' if len(result['description']) > 300 else ''}\n\n"
     
-    # Status information
-    hd_status = interpret_status(result['status_hd'])
-    k4_status = interpret_status(result['status_4k'])
-    media_text += f"📊 *Availability:*\n"
-    media_text += f"   • HD (1080p): {hd_status}\n"
-    media_text += f"   • 4K (UHD): {k4_status}\n"
+    # Status information (skip in request_more_mode to save space and make content different)
+    if not request_more_mode:
+        hd_status = interpret_status(result['status_hd'])
+        k4_status = interpret_status(result['status_4k'])
+        media_text += f"📊 *Availability:*\n"
+        media_text += f"   • HD (1080p): {hd_status}\n"
+        media_text += f"   • 4K (UHD): {k4_status}\n"
 
     # Build action buttons
     keyboard = []
-    back_button = InlineKeyboardButton("⬅️ Back", callback_data="back_to_results")
+    if request_more_mode:
+        back_button = InlineKeyboardButton("⬅️ Back to Details", callback_data="back_to_results")
+    else:
+        back_button = InlineKeyboardButton("⬅️ Back", callback_data="back_to_results")
 
     overseerr_telegram_user_id = context.user_data.get("overseerr_telegram_user_id")
     if overseerr_telegram_user_id:
         # Request buttons
-        if can_request_resolution(result['status_hd']):
+        # In request_more_mode, always show seasons if available (we've already determined they're unavailable)
+        # In normal mode, check if we can request this resolution
+        can_show_request_buttons = request_more_mode or can_request_resolution(result['status_hd'])
+        
+        if can_show_request_buttons:
             if result['mediaType'] == 'tv':
                 # Get seasons from cache
                 seasons = context.user_data.get(f"seasons_{result['id']}")
-                if seasons and len(seasons) > 1:
-                    # Multiple seasons - show season selection
+                # In request_more_mode, show seasons even if there's only 1
+                # In normal mode, only show if there are multiple seasons
+                should_show_seasons = seasons and (request_more_mode or len(seasons) > 1)
+                
+                if should_show_seasons:
+                    # Show season selection
                     for sn in seasons:
                         is_selected = sn in selected_seasons
                         emoji = "✅" if is_selected else "⭕"
@@ -258,7 +282,10 @@ def build_media_details_message(result, context: ContextTypes.DEFAULT_TYPE, sele
                                                callback_data=f"finalize_seasons_{result['id']}")
                         ])
                 
-                btn_1080p = InlineKeyboardButton("📥 All in 1080p", callback_data=f"confirm_1080p_{result['id']}")
+                if request_more_mode:
+                    btn_1080p = InlineKeyboardButton("📥 Request All Remaining in 1080p", callback_data=f"confirm_1080p_{result['id']}")
+                else:
+                    btn_1080p = InlineKeyboardButton("📥 All in 1080p", callback_data=f"confirm_1080p_{result['id']}")
             else:
                 btn_1080p = InlineKeyboardButton("📥 1080p", callback_data=f"confirm_1080p_{result['id']}")
             
@@ -266,10 +293,23 @@ def build_media_details_message(result, context: ContextTypes.DEFAULT_TYPE, sele
 
         if can_request_resolution(result['status_4k']) and user_can_request_4k(overseerr_telegram_user_id, result['mediaType']):
             if result['mediaType'] == 'tv':
-                btn_4k = InlineKeyboardButton("📥 All in 4K", callback_data=f"confirm_4k_{result['id']}")
+                if request_more_mode:
+                    btn_4k = InlineKeyboardButton("📥 Request All Remaining in 4K", callback_data=f"confirm_4k_{result['id']}")
+                else:
+                    btn_4k = InlineKeyboardButton("📥 All in 4K", callback_data=f"confirm_4k_{result['id']}")
             else:
                 btn_4k = InlineKeyboardButton("📥 4K", callback_data=f"confirm_4k_{result['id']}")
             keyboard.append([btn_4k])
+
+        # Request More button for TV shows with unavailable seasons (but not in request_more_mode)
+        if result['mediaType'] == 'tv' and not request_more_mode:
+            try:
+                requestable_seasons = await get_requestable_seasons(result['id'])
+                if requestable_seasons:
+                    request_more_button = InlineKeyboardButton("📥 Request More", callback_data=f"request_more_{result['id']}")
+                    keyboard.append([request_more_button])
+            except Exception as e:
+                logger.warning(f"Failed to check unavailable seasons for {result['id']}: {e}")
 
         # Report issue button
         if is_reportable(result['status_hd']) or is_reportable(result['status_4k']):
@@ -349,7 +389,7 @@ async def process_user_selection(update_or_query, context: ContextTypes.DEFAULT_
     selected_seasons = set(context.user_data.get('selected_seasons', []))
     
     # Build media details using the new function
-    media_text, keyboard = build_media_details_message(result, context, selected_seasons)
+    media_text, keyboard = await build_media_details_message(result, context, selected_seasons, request_more_mode=False)
     
     # Check if user is authenticated - if not, show authentication message
     overseerr_telegram_user_id = context.user_data.get("overseerr_telegram_user_id")

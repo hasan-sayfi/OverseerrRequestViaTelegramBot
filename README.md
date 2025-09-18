@@ -27,6 +27,8 @@ The **Overseerr Telegram Bot** enables seamless interaction with your Overseerr 
 
 - **Title Requests**: Request missing titles in HD, 4K, or both, respecting Overseerr user permissions for quality settings.
 
+- **🎬 Request More Seasons**: Smart TV show season management - automatically identifies and allows requesting only seasons that haven't been requested or aren't already available. Select specific seasons or request all remaining seasons with one click.
+
 - **Issue Reporting**: Report issues like video glitches, audio sync problems, missing subtitles, or other playback errors for existing titles.
 
 - **Notification Management**: Customize Telegram notifications for Overseerr events (e.g., request approvals, media availability) with options to enable/disable or use silent mode.
@@ -65,7 +67,9 @@ The **Overseerr Telegram Bot** enables seamless interaction with your Overseerr 
 
 - **📊 Real-time Availability** - Check HD (1080p) and 4K availability across your media library- **Ubuntu (Source Installation)**: Follow the guide at [Installation on Ubuntu](https://github.com/LetsGoDude/OverseerrRequestViaTelegramBot/wiki#source-installation-ubuntulinux).
 
-- **🎬 One-click Requests** - Request missing titles with quality preferences- **Docker**: Deploy with [Docker](https://github.com/LetsGoDude/OverseerrRequestViaTelegramBot/wiki#docker-installation-without-compose), [Docker Compose](https://github.com/LetsGoDude/OverseerrRequestViaTelegramBot/wiki#docker-installation-with-compose) or [NAS Container](https://github.com/LetsGoDude/OverseerrRequestViaTelegramBot/wiki#nas-container-setup) using the instructions at the wiki.
+- **🎬 Smart Requests** - Request missing titles with quality preferences and intelligent season management for TV shows
+
+- **📺 Request More Seasons** - Automatically identifies and requests only unrequested/unavailable TV show seasons
 
 - **🐛 Issue Reporting** - Report video, audio, subtitle, and playback problems
 

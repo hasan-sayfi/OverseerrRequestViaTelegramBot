@@ -180,6 +180,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             media_id = int(data.replace("finalize_seasons_", ""))
             await handle_season_request(query, context, media_id)
         
+        # Request More seasons callback
+        elif data.startswith("request_more_"):
+            media_id = int(data.replace("request_more_", ""))
+            await handle_request_more_seasons(query, context, media_id)
+        
         # Issue reporting callbacks
         elif data.startswith("report_"):
             media_id = int(data.replace("report_", ""))
@@ -671,9 +676,12 @@ async def handle_season_toggle(query: CallbackQuery, context: ContextTypes.DEFAU
         # Get the selected seasons list for display
         selected_seasons = set(context.user_data.get('selected_seasons', []))
         
+        # Check if we're in request_more mode by checking if we have cached seasons
+        is_request_more_mode = f"seasons_{media_id}" in context.user_data
+        
         # Rebuild the media details with updated season buttons inline
         from handlers.ui_handlers import build_media_details_message
-        media_text, keyboard = build_media_details_message(selected_result, context, selected_seasons)
+        media_text, keyboard = await build_media_details_message(selected_result, context, selected_seasons, request_more_mode=is_request_more_mode)
         
         # Edit the existing message caption with updated buttons
         try:
@@ -760,21 +768,21 @@ async def handle_issue_type_selection(query: CallbackQuery, context: ContextType
     """Handle issue type selection and prompt for description."""
     reporting_issue = context.user_data.get("reporting_issue", {})
     if not reporting_issue:
-        await query.edit_message_text("❌ Issue reporting session expired.")
+        await safe_edit_message(query, "❌ Issue reporting session expired.")
         return
-    
+
     # Store the selected issue type
     issue_type_name = ISSUE_TYPES.get(issue_type, "Unknown")
     reporting_issue["issue_type"] = issue_type
     reporting_issue["issue_type_name"] = issue_type_name
     reporting_issue["step"] = "await_description"
     context.user_data["reporting_issue"] = reporting_issue
-    
-    await query.edit_message_text(
+
+    await safe_edit_message(
+        query,
         f"🛠 *Report Issue - {issue_type_name}*\n\n"
         "Please describe the issue you're experiencing with this media.\n\n"
-        "💬 *Send your description as a message.*",
-        parse_mode="Markdown"
+        "💬 *Send your description as a message.*"
     )
 
 async def show_manage_notifications_menu(query: CallbackQuery, context: ContextTypes.DEFAULT_TYPE):
@@ -1218,3 +1226,63 @@ async def handle_all_tv_anime_selection(query: CallbackQuery, context: ContextTy
         caption=status_msg,
         parse_mode="Markdown"
     )
+
+async def handle_request_more_seasons(query: CallbackQuery, context: ContextTypes.DEFAULT_TYPE, media_id: int):
+    """Handle 'Request More' button - show season selection for unavailable seasons only."""
+    from api.overseerr_api import get_requestable_seasons
+    
+    try:
+        # Get list of requestable seasons
+        requestable_seasons = await get_requestable_seasons(media_id)
+        
+        if not requestable_seasons:
+            await query.answer("No more seasons available to request.", show_alert=True)
+            return
+        
+        # Find the selected result from search results
+        search_results = context.user_data.get("search_results", [])
+        selected_result = None
+        for result in search_results:
+            if result.get('id') == media_id:
+                selected_result = result
+                break
+        
+        if not selected_result:
+            await query.edit_message_text("❌ Media not found.")
+            return
+        
+        # Clear any previous season selections
+        context.user_data.pop('selected_seasons', None)
+        
+        # Cache the requestable seasons so the toggle mechanism works
+        context.user_data[f"seasons_{media_id}"] = requestable_seasons
+        
+        # Update the selected result in context
+        context.user_data["selected_result"] = selected_result
+        
+        # Build media details message with only requestable seasons shown
+        from handlers.ui_handlers import build_media_details_message
+        media_text, keyboard = await build_media_details_message(selected_result, context, set(), request_more_mode=True)
+        
+        try:
+            await query.edit_message_caption(
+                caption=media_text,
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+        except Exception as e:
+            logger.error(f"Failed to edit message caption: {e}")
+            # If editing fails, fall back to editing text
+            try:
+                await query.edit_message_text(
+                    media_text,
+                    parse_mode="Markdown",
+                    reply_markup=InlineKeyboardMarkup(keyboard)
+                )
+            except Exception as e2:
+                logger.error(f"Failed to edit message text: {e2}")
+                await query.answer("Failed to update interface", show_alert=True)
+                
+    except Exception as e:
+        logger.error(f"Error in handle_request_more_seasons: {e}")
+        await query.answer("Failed to load more seasons", show_alert=True)
