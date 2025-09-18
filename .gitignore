@@ -348,3 +348,6 @@ notification_settings.json
 
 # Migration scripts (no longer needed)
 migrate.py
+
+# Backup files
+*.bak
