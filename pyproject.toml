@@ -30,3 +30,6 @@ tag = true
 tag_name = "v{new_version}"
 message = "Bump version: {current_version} → {new_version}"
 allow_dirty = true
+
+[[tool.bumpversion.files]]
+filename = "pyproject.toml"
